@@ -17,6 +17,9 @@ services:
     # 每次 up 都拉取最新镜像，保证 git pull 后能拿到新版本
     pull_policy: always
     ports:
+      # Lucky 跑在宿主机（host 网络）时，用下面这行只监听本机，避免绕过反代直连
+      # - "127.0.0.1:8099:8099"
+      # Lucky 跑在 Docker bridge 网络时，用容器名互通，可不加 ports 或保留下面这行
       - "8099:8099"
     environment:
       - PORT=8099
