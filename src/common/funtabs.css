@@ -474,3 +474,82 @@
 		opacity: 1;
 	}
 }
+
+/* ============ 左侧竖向分类导航（仿 WeTab） ============ */
+.side-tabs {
+	position: fixed;
+	left: 14px;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 8px;
+	border-radius: 14px;
+	background: rgba(0, 0, 0, 0.18);
+	backdrop-filter: blur(14px);
+	-webkit-backdrop-filter: blur(14px);
+	max-height: 72vh;
+	overflow-y: auto;
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+	scrollbar-width: thin;
+}
+.side-tabs::-webkit-scrollbar {
+	width: 4px;
+}
+.side-tabs::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.25);
+	border-radius: 2px;
+}
+
+.side-tab-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	padding: 9px 10px;
+	min-width: 66px;
+	border-radius: 10px;
+	cursor: pointer;
+	transition: background 0.18s ease, box-shadow 0.18s ease;
+	user-select: none;
+	position: relative;
+}
+.side-tab-item:hover {
+	background: rgba(255, 255, 255, 0.14);
+}
+.side-tab-item.active {
+	background: rgba(255, 255, 255, 0.22);
+	box-shadow: inset 3px 0 0 0 #4da3ff;
+	font-weight: bold;
+}
+
+.side-tab-icon {
+	font-size: 19px;
+	line-height: 1;
+}
+.side-tab-label {
+	font-size: 12px;
+	max-width: 76px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: center;
+}
+
+/* 左侧导航时给卡片网格区让位（JS 加此类） */
+.gridArea.with-side-tabs {
+	padding-left: 108px;
+}
+
+/* 窄屏隐藏侧栏（home 会同时回退到顶部 Tabs） */
+@media (max-width: 900px) {
+	.side-tabs {
+		display: none;
+	}
+	.gridArea.with-side-tabs {
+		padding-left: 0;
+	}
+}

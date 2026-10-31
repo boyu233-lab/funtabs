@@ -51,6 +51,7 @@ import LogoArea from "./logoArea";
 import SearchTools from "./searchTools";
 import Settings from "./settings";
 import ShowList from "./showList";
+import SideTabs from "./sideTabs";
 import TabsManager from "./tabsManager";
 
 const Home = () => {
@@ -149,6 +150,25 @@ const Home = () => {
 				: funtabsData.cardStyle;
 		return localCardStyle;
 	});
+
+	// 分类导航位置：顶部横向 Tabs（默认）/ 左侧竖向导航（仿 WeTab）
+	// 存进 funtabsData.layout，随 NAS 同步，换设备保持一致
+	const [tabPosition, setTabPosition] = useState(() => {
+		const local =
+			localData && localData.newData.tabPosition
+				? localData.newData.tabPosition
+				: funtabsData.tabPosition;
+		return local === "left" ? "left" : "top";
+	});
+
+	// 窄屏（<900px）时左侧导航不可用，强制回退顶部 Tabs
+	const [isWide, setIsWide] = useState(() => window.innerWidth > 900);
+	useEffect(() => {
+		const onResize = () => setIsWide(window.innerWidth > 900);
+		window.addEventListener("resize", onResize);
+		return () => window.removeEventListener("resize", onResize);
+	}, []);
+	const sideTabsEnabled = tabPosition === "left" && isWide;
 
 	const [gap, setGap] = useState(() => {
 		const localGap =
@@ -471,6 +491,7 @@ const Home = () => {
 		newData.cardStyle = cardStyle;
 		newData.radius = radius;
 		newData.gridWidthNum = gridWidthNum;
+		newData.tabPosition = tabPosition;
 		window.localStorage.setItem("funtabs", JSON.stringify({ newData }));
 
 		const localHotEventColor =
@@ -587,8 +608,14 @@ const Home = () => {
 						setGridWidthNum(
 							parseInt(JSON.parse(e.newValue).newData.gridWidthNum)
 						);
-						setGap(parseInt(JSON.parse(e.newValue).newData.gap));
-						setCardStyle(JSON.parse(e.newValue).newData.cardStyle);
+					setGap(parseInt(JSON.parse(e.newValue).newData.gap));
+					setCardStyle(JSON.parse(e.newValue).newData.cardStyle);
+					// 旧数据可能没有 tabPosition，缺省回退顶部
+					setTabPosition(
+						JSON.parse(e.newValue).newData.tabPosition === "left"
+							? "left"
+							: "top"
+					);
 						const localActiveKey = parseInt(
 							localStorage.getItem("activeKey")
 								? localStorage.getItem("activeKey")
@@ -682,17 +709,22 @@ const Home = () => {
 							setGridWidthNum(
 								parseInt(JSON.parse(e.newValue).newData.gridWidthNum)
 							);
-							setGap(parseInt(JSON.parse(e.newValue).newData.gap));
-							setCardStyle(JSON.parse(e.newValue).newData.cardStyle);
-							const localActiveKey = parseInt(
-								localStorage.getItem("activeKey")
-									? localStorage.getItem("activeKey")
-									: JSON.parse(e.newValue).newData.tabsActiveKey
+						setGap(parseInt(JSON.parse(e.newValue).newData.gap));
+						setCardStyle(JSON.parse(e.newValue).newData.cardStyle);
+						setTabPosition(
+							JSON.parse(e.newValue).newData.tabPosition === "left"
+								? "left"
+								: "top"
+						);
+						const localActiveKey = parseInt(
+							localStorage.getItem("activeKey")
+								? localStorage.getItem("activeKey")
+								: JSON.parse(e.newValue).newData.tabsActiveKey
+						);
+						try {
+							const targetItem = JSON.parse(e.newValue).newData.content.find(
+								(item) => item.key === localActiveKey
 							);
-							try {
-								const targetItem = JSON.parse(e.newValue).newData.content.find(
-									(item) => item.key === localActiveKey
-								);
 								let targetKey;
 								if (!targetItem) {
 									targetKey = parseInt(
@@ -1021,29 +1053,48 @@ const Home = () => {
 									edit={edit}
 								/>
 							</div>
+						<div
+							className={`gridArea${
+								sideTabsEnabled ? " with-side-tabs" : ""
+							}`}
+							style={{
+								pointerEvents: "none",
+							}}
+						>
+							{/* 左侧竖向分类导航（仿 WeTab），单分类时不显示 */}
+							{sideTabsEnabled && tabsVisibility !== "none" ? (
+								<SideTabs
+									tabs={newlinkList}
+									activeKey={tabsActiveKey}
+									fontColor={fontColor}
+									drag={drag}
+									onChange={(key) => {
+										setTabsActiveKey(key);
+										saveActiveKey(key);
+									}}
+								/>
+							) : null}
 							<div
-								className="gridArea"
+								key="showList"
 								style={{
-									pointerEvents: "none",
+									width: "100%",
+									display: model,
+									marginTop: "-32px",
 								}}
 							>
 								<div
-									key="showList"
 									style={{
-										width: "100%",
-										display: model,
-										marginTop: "-32px",
+										minHeight: "20px",
 									}}
 								>
-									<div
-										style={{
-											minHeight: "20px",
-										}}
-									>
 										<Tabs
 											id="option_tabs"
 											items={newlinkList}
 											activeKey={tabsActiveKey}
+											// 左侧导航模式下隐藏顶部切换条，分类切换交给 SideTabs
+											renderTabBar={
+												sideTabsEnabled ? () => null : undefined
+											}
 											tabBarStyle={{
 												color: fontColor,
 												fontWeight: "bold",
@@ -1131,12 +1182,14 @@ const Home = () => {
 								editFunction={editFunction}
 								radius={radius}
 								setRadius={setRadius}
-								cardStyle={cardStyle}
-								setCardStyle={setCardStyle}
-								gap={gap}
-								setGap={setGap}
-								tabsActiveKey={tabsActiveKey}
-								setTabsActiveKey={setTabsActiveKey}
+							cardStyle={cardStyle}
+							setCardStyle={setCardStyle}
+							tabPosition={tabPosition}
+							setTabPosition={setTabPosition}
+							gap={gap}
+							setGap={setGap}
+							tabsActiveKey={tabsActiveKey}
+							setTabsActiveKey={setTabsActiveKey}
 								funtabsData={funtabsData}
 								setTabsVisibility={setTabsVisibility}
 								localData={localData}

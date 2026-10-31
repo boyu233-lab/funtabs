@@ -24,6 +24,8 @@ const Settings = React.memo((props) => {
 		setRadius,
 		cardStyle,
 		setCardStyle,
+		tabPosition,
+		setTabPosition,
 		funtabsData,
 		gap,
 		setGap,
@@ -188,9 +190,24 @@ const Settings = React.memo((props) => {
 							}
 						}}
 					/>
-					<p>卡片样式：</p>
-					<CardStyleSelect />
-					<AddNewCard
+				<p>卡片样式：</p>
+				<CardStyleSelect />
+				<p>导航位置：</p>
+				<Select
+					style={{ marginRight: "12px", width: "86px" }}
+					value={tabPosition}
+					onChange={(e) => {
+						setTabPosition(e);
+						if (e === "left") {
+							message.success("已切换为左侧导航，保存后生效并同步到 NAS");
+						}
+					}}
+					options={[
+						{ value: "top", label: "顶部" },
+						{ value: "left", label: "左侧" },
+					]}
+				/>
+				<AddNewCard
 						model={model}
 						linkList={linkList}
 						setLinkList={setLinkList}

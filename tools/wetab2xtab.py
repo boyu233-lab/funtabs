@@ -46,6 +46,7 @@ DEFAULT_LAYOUT = {
     "gap": 24,
     "cardStyle": "defaultCard",
     "tabsActiveKey": 0,
+    "tabPosition": "top",
     "backgroundImage": "/images/wallpaper.JPG",
 }
 
