@@ -1,21 +1,15 @@
 import {
 	AppstoreFilled,
-	BellFilled,
 	FormatPainterFilled,
 	GithubFilled,
-	HeartFilled,
 	HomeFilled,
 	InteractionFilled,
-	LockFilled,
-	QqOutlined,
 	RedoOutlined,
 	WarningFilled,
-	WechatOutlined,
 } from "@ant-design/icons";
 import {
 	Button,
 	Col,
-	Divider,
 	Dropdown,
 	Input,
 	InputNumber,
@@ -25,14 +19,11 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { useWindowSize } from "react-use";
-import { get } from "../common/fetch";
+
 import "../common/funtabs.css";
-import variable from "../common/variable";
 import "../index.css";
 import BackupData from "./backupData";
-import Donate from "./donate";
 import ResetData from "./resetData";
-import UpdateList from "./updateList";
 
 const Header = (props) => {
 	const {
@@ -80,11 +71,6 @@ const Header = (props) => {
 
 	const moreMenu = [
 		{
-			key: "notice",
-			label: <UpdateList />,
-			icon: <BellFilled />,
-		},
-		{
 			key: "BackupRecovery",
 			label: <BackupData />,
 			icon: <InteractionFilled />,
@@ -93,11 +79,6 @@ const Header = (props) => {
 			key: "recovery",
 			label: <ResetData />,
 			icon: <WarningFilled />,
-		},
-		{
-			key: "donate",
-			label: <Donate />,
-			icon: <HeartFilled />,
 		},
 		{
 			key: "home",
@@ -120,56 +101,12 @@ const Header = (props) => {
 					target={linkOpen}
 					rel="noreferrer"
 				>
-					Github
+					上游 funtabs
 				</a>
 			),
 			icon: <GithubFilled />,
 		},
-		{
-			key: "wxqrCode",
-			label: (
-				<a href="./images/wx.JPG" target="_blank" rel="noreferrer">
-					关注我们
-				</a>
-			),
-			icon: <WechatOutlined />,
-		},
-		{
-			key: "privacyPolicy",
-			label: (
-				<a href="https://privacy.funtabs.cn" target={linkOpen} rel="noreferrer">
-					隐私权政策
-				</a>
-			),
-			icon: <LockFilled />,
-		},
-		{
-			key: "qq",
-			label: (
-				<a
-					href="https://qm.qq.com/cgi-bin/qm/qr?k=6N9Y0wlXF5txRjJcBqSYByj0fDsNwjIs&authKey=ziF+0yZBKLQB8GFFDJEHTXMaz35chgIPb88v98Vwdytvym5UlNMWOBOEwMAEHlMj&noverify=0"
-					target={linkOpen}
-					rel="noreferrer"
-				>
-					QQ群：727809499
-				</a>
-			),
-			icon: <QqOutlined />,
-		},
 	];
-
-	const [moreServe] = useState([
-		{
-			label: "官网",
-			link: "https://www.funtabs.cn",
-			icon: "https://www.funtabs.cn/logo.svg",
-		},
-		{
-			label: "雨云服务器",
-			link: "https://www.rainyun.com/funtabs_",
-			icon: "https://app.rainyun.com/favicon.ico",
-		},
-	]);
 
 	function showOthers() {
 		return (
@@ -389,57 +326,20 @@ const Header = (props) => {
 						/>
 					</div>
 				</Space>
-				<Divider style={{ margin: "12px 0px" }}>
-					<Donate />
-				</Divider>
-				<div className="more-products-grid">
-					{moreServe.map((item, index) => {
-						return (
-							<div
-								key={index}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									flexDirection: "column",
-								}}
-								onClick={() => {
-									window.open(item.link, linkOpen);
-								}}
-							>
-								<img
-									src={item.icon}
-									alt=""
-									style={{ width: "38px", height: "38px" }}
-								/>
-								<p
-									style={{
-										fontSize: "10px",
-										fontWeight: "bold",
-										marginTop: "4px",
-									}}
-								>
-									{item.label}
-								</p>
-							</div>
-						);
-					})}
-				</div>
 			</>
 		);
 	}
 
 	function getRandomWallpaper() {
-		get(variable.randomWallpaper).then((res) => {
-			if (res) {
-				const image = new Image();
-				image.src = res;
-				image.onload = function () {
-					setUrl(res);
-					setWallpaperType("image");
-					localStorage.setItem("backgroundImage", res);
-				};
-			}
-		});
+		// 改用 picsum 随机图，不再请求原作者服务器
+		const res = `https://picsum.photos/1920/1080?random=${Date.now()}`;
+		const image = new Image();
+		image.src = res;
+		image.onload = function () {
+			setUrl(res);
+			setWallpaperType("image");
+			localStorage.setItem("backgroundImage", res);
+		};
 	}
 
 	return (

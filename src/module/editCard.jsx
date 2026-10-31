@@ -1,3 +1,4 @@
+import { uploadFileToNas } from "../common/uploadFile";
 import { SettingTwoTone, UploadOutlined } from "@ant-design/icons";
 import {
 	Button,
@@ -14,7 +15,7 @@ import {
 import Paragraph from "antd/es/typography/Paragraph";
 import _ from "lodash";
 import React, { useEffect, useState } from "react";
-import { get, post } from "../common/fetch";
+import { get } from "../common/fetch";
 import { postClear } from "../common/fetchClear";
 import { hexToRgb } from "../common/hexToRgb";
 import variable from "../common/variable";
@@ -668,18 +669,9 @@ const EditCard = (props) => {
 										message.error("文件大小不能超过100KB！");
 										return false;
 									}
-									const formData = new FormData();
-									formData.append("file", file);
-									const token = window.localStorage.getItem("token");
-									if (token) {
-										post(`${variable.uploadFavicon}`, formData, token).then(
-											(res) => {
-												setIcon(res.url);
-											}
-										);
-									} else {
-										message.error("用户未登录，更换图标失败");
-									}
+									uploadFileToNas(file)
+										.then((res) => setIcon(res.url))
+										.catch(() => message.error("图标上传失败，请稍后重试"));
 									return false;
 								}}
 								showUploadList={false}

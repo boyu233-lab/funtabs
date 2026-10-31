@@ -71,7 +71,8 @@ function FestivalRemind(props) {
 	});
 
 	function getFestival(year) {
-		getClear(`${variable.festival}`).then((data) => {
+		// 追加年份参数，使用 timor.tech 公共节假日 API
+		getClear(`${variable.festival}${year}`).then((data) => {
 			for (let key in localStorage) {
 				if (key.startsWith("festival_")) {
 					localStorage.removeItem(key);

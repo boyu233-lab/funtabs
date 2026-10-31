@@ -189,6 +189,13 @@ npm run server    # 启动后端，托管 build/ 静态文件
 | PUT | `/api/data` | 写入数据；带 `?force=1` 跳过冲突检测 |
 | POST | `/api/upload` | 上传图片（base64），落盘后返回 URL |
 | GET | `/api/wallpaper/bing` | Bing 每日壁纸代理（解决跨域，只返回 URL） |
+| GET | `/api/webtitle?url=` | 抓取目标网页标题（添加书签时自动填标题） |
+| GET | `/api/favicon?url=` | 抓取并缓存网站图标到 `data/favicons/`，返回本地 URL |
+| GET | `/api/hotEvent/:type` | 热搜聚合（weibo/douyin/bili/toutiao/tieba/baidu/zhihu/sspai），上游为 60s API，可用 `HOT_API_BASE` 指向自托管实例 |
+| GET | `/api/fanyi?text=` | 翻译代理（MyMemory 免费 API，自动识别中英互译） |
+
+> 以上接口已完全替代原作者服务器 api.funtabs.cn 的对应能力；
+> 广告、捐赠、遥测上报（saveWebInfo）、百度统计均已从代码中移除。
 
 写入时若客户端 `updatedAt` 与服务端不一致会返回 `409` 并附带服务端版本，
 前端据此提示冲突；`force=1` 可强制覆盖。

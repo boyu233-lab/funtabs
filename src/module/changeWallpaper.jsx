@@ -1,3 +1,4 @@
+import { uploadFileToNas } from "../common/uploadFile";
 import {
 	BgColorsOutlined,
 	CloudUploadOutlined,
@@ -27,10 +28,9 @@ import {
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useUpdateEffect } from "react-use";
-import { get, post } from "../common/fetch";
+
 import "../common/funtabs.css";
 import { hexToRgb } from "../common/hexToRgb";
-import variable from "../common/variable";
 import "../index.css";
 import {
 	setSearchAutoFocus,
@@ -379,13 +379,12 @@ export default function ChangeWallpaper(props) {
 								message.error("文件大小不能超过 5MB！");
 								return false;
 							}
-							const formData = new FormData();
-							formData.append("file", file);
-							const token = window.localStorage.getItem("token");
-							post(`${variable.uploadImages}`, formData, token).then((res) => {
-								setInputContent(res.url);
-								setPreviewImage(res.url);
-							});
+							uploadFileToNas(file)
+								.then((res) => {
+									setInputContent(res.url);
+									setPreviewImage(res.url);
+								})
+								.catch(() => message.error("壁纸上传失败，请稍后重试"));
 							//将图片转为base64使用
 							// const isLt2M = file.size / 1024 / 1024 < 4;
 							// if (!isLt2M) {
@@ -527,18 +526,9 @@ export default function ChangeWallpaper(props) {
 									// reader.onloadend = function () {
 									//     setLogoUrl(reader.result)
 									// }
-									const formData = new FormData();
-									formData.append("file", file);
-									const token = window.localStorage.getItem("token");
-									if (token) {
-										post(`${variable.uploadImages}`, formData, token).then(
-											(res) => {
-												setLogoUrl(res.url);
-											}
-										);
-									} else {
-										message.error("用户未登录，更换图标失败");
-									}
+									uploadFileToNas(file)
+										.then((res) => setLogoUrl(res.url))
+										.catch(() => message.error("图标上传失败，请稍后重试"));
 								}
 								return false;
 							}}
@@ -588,12 +578,10 @@ export default function ChangeWallpaper(props) {
 	}
 
 	function getRandomWallpaper() {
-		get(variable.randomWallpaper).then((res) => {
-			if (res) {
-				setInputContent(res);
-				setPreviewImage(res);
-			}
-		});
+		// 改用 picsum 随机图，不再请求原作者服务器
+		const res = `https://picsum.photos/1920/1080?random=${Date.now()}`;
+		setInputContent(res);
+		setPreviewImage(res);
 	}
 
 	const wallpaperItems = [

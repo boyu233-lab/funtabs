@@ -1,3 +1,4 @@
+import { uploadFileToNas } from "../common/uploadFile";
 import {
 	DeleteOutlined,
 	DownOutlined,
@@ -29,9 +30,7 @@ import _ from "lodash";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { ReactSortable } from "react-sortablejs";
-import { post } from "../common/fetch";
 import "../common/funtabs.css";
-import variable from "../common/variable";
 import { IconSource } from "./iconSource";
 const { useToken } = theme;
 const SearchTools = (props) => {
@@ -610,7 +609,7 @@ const SearchTools = (props) => {
 									? "按下Tab键可快速切换搜索引擎"
 									: edit === ""
 									? "tips:双击页面可快速切换卡片分类"
-									: "开发不易，如您喜欢，感谢捐赠支持！"
+									: "输入关键词开始搜索"
 							}
 							size="large"
 							onFocusCapture={() => {
@@ -838,24 +837,15 @@ const SearchTools = (props) => {
 													message.error("文件大小不能超过100KB！");
 													return false;
 												}
-												const formData = new FormData();
-												formData.append("file", file);
-												const token = window.localStorage.getItem("token");
-												if (token) {
-													post(
-														`${variable.uploadFavicon}`,
-														formData,
-														token
-													).then((res) => {
+												uploadFileToNas(file)
+													.then((res) => {
 														const newData = [...searchEngineData];
 														newData[index].icon = res.url;
 														setSearchEngineData(newData);
 														document.getElementById(`searchEngine${key}`).src =
 															res.url;
-													});
-												} else {
-													message.error("用户未登录，更换图标失败");
-												}
+													})
+													.catch(() => message.error("图标上传失败，请稍后重试"));
 												return false;
 											},
 											maxCount: 1,

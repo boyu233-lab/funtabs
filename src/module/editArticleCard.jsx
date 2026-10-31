@@ -1,3 +1,4 @@
+import { uploadFileToNas } from "../common/uploadFile";
 import { SettingTwoTone, UploadOutlined } from "@ant-design/icons";
 import {
 	Button,
@@ -16,7 +17,7 @@ import _ from "lodash";
 import { useEffect, useState } from "react";
 import ReactMde from "react-mde";
 import "react-mde/lib/styles/css/react-mde-all.css";
-import { get, post } from "../common/fetch";
+import { get } from "../common/fetch";
 import variable from "../common/variable";
 
 const options = [
@@ -119,16 +120,9 @@ function EditArticleCard(props) {
 			message.error("文件大小不能超过 5MB！");
 			return false;
 		}
-		const formData = new FormData();
-		formData.append("file", file);
-		const token = window.localStorage.getItem("token");
-		if (token) {
-			post(`${variable.uploadImages}`, formData, token).then((res) => {
-				setArticleCover(res.url);
-			});
-		} else {
-			message.error("用户未登录，上传封面图失败");
-		}
+		uploadFileToNas(file)
+			.then((res) => setArticleCover(res.url))
+			.catch(() => message.error("封面图上传失败，请稍后重试"));
 		return false;
 	};
 

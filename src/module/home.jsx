@@ -7,7 +7,6 @@ import {
 	DownOutlined,
 	FileMarkdownOutlined,
 	FormatPainterOutlined,
-	HeartOutlined,
 	PictureOutlined,
 	PlusSquareOutlined,
 	TableOutlined,
@@ -16,7 +15,6 @@ import {
 import { animated, useSpring } from "@react-spring/web";
 import Device from "@skillnull/device-js";
 import {
-	Divider,
 	Dropdown,
 	FloatButton,
 	Tabs,
@@ -49,7 +47,6 @@ import Bookmarks from "./bookmarks";
 import ChangeWallpaper from "./changeWallpaper";
 import Clock from "./clock";
 import { funtabsData } from "./data";
-import Donate from "./donate";
 import Header from "./header";
 import LogoArea from "./logoArea";
 import ObsidianPanel from "./obsidianPanel";
@@ -296,7 +293,8 @@ const Home = () => {
 		width: `${newWidth()}px`,
 	};
 
-	const [messageApi, contextHolder] = notification.useNotification();
+	// 通知弹窗已移除，保留占位避免改动 JSX
+	const [, contextHolder] = notification.useNotification();
 
 	// NAS 同步状态："synced" 已同步 | "offline" 离线用缓存 | "pending" 待回写 | "conflict" 冲突
 	const [syncState, setSyncState] = useState("synced");
@@ -364,29 +362,6 @@ const Home = () => {
 			}
 		});
 	}, [dailyWallpaper]);
-
-	const openNotification = (id, title, content) => {
-		const paragraphs = content.split("；");
-		messageApi.open({
-			message: title,
-			duration: null,
-			description: (
-				<>
-					{paragraphs.map((paragraph, index) => (
-						<p key={index}>
-							{paragraph}
-							{paragraph ? "；" : null}
-						</p>
-					))}
-					<Divider style={{ margin: "12px 0px" }} />
-					官方网站为：https://funtabs.cn，欢迎大家分享网站给每一个喜爱简约的他/她使用，浏览器插件版本可在插件商店获取，我们的QQ交流群：727809499；
-				</>
-			),
-			onClose: () => {
-				window.localStorage.setItem("noticeOpen", id);
-			},
-		});
-	};
 
 	function newWidth() {
 		return parseInt(gridWidthNum) < parseInt(gridWidth)
@@ -750,13 +725,6 @@ const Home = () => {
 	}, []);
 
 	useEffect(() => {
-		if (localStorage.getItem("noticeOpen") !== "20230829") {
-			openNotification(
-				20230829,
-				"更新提醒v1.2.5.3（2023.8.29）",
-				"1、云服务器推荐：雨云，购买使用我可获得提成，感谢大家支持，有需要的可以看看https://www.rainyun.com/funtabs_；2、开源版本部分功能阉割，欢迎使用在线版本；3、感谢大家捐赠支持"
-			);
-		}
 		Device.Info({
 			info: ["deviceType"],
 		}).then((data) => {
@@ -850,11 +818,6 @@ const Home = () => {
 			),
 			key: "5",
 			icon: <UploadOutlined />,
-		},
-		{
-			label: <Donate />,
-			key: "6",
-			icon: <HeartOutlined />,
 		},
 	];
 

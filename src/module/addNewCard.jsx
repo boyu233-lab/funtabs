@@ -1,3 +1,4 @@
+import { uploadFileToNas } from "../common/uploadFile";
 import { PlusCircleTwoTone, UploadOutlined } from "@ant-design/icons";
 import {
 	Button,
@@ -15,8 +16,8 @@ import {
 import Paragraph from "antd/es/typography/Paragraph";
 import _ from "lodash";
 import React, { useEffect, useState } from "react";
-import { get, post } from "../common/fetch";
-import { postClear } from "../common/fetchClear";
+import { get } from "../common/fetch";
+// postClear 不再使用（已移除 saveWebInfo 遥测）
 import "../common/funtabs.css";
 import { hexToRgb } from "../common/hexToRgb";
 import variable from "../common/variable";
@@ -139,27 +140,12 @@ const AddNewCard = (props) => {
 						linkList.filter((item) => item.key === tabsActiveKey)[0].label
 					}】分类`
 				);
-				const token = localStorage.getItem("token");
-				if (token) {
-					saveWebInfo(a, b, c, color, token);
-				}
 				if (from === undefined) {
 					setAddIsModalOpen(false);
 				}
 			}
 		}
 	};
-
-	async function saveWebInfo(label, link, icon, backgroundColor, token) {
-		const formData = new FormData();
-		formData.append("label", label);
-		formData.append("link", link);
-		formData.append("icon", icon);
-		formData.append("backgroundColor", backgroundColor);
-		try {
-			await postClear(variable.saveWebInfo, formData, token);
-		} catch (error) {}
-	}
 
 	function saveArticle(url, title, content, cover) {
 		if (title === "" || content === "") {
@@ -553,20 +539,11 @@ const AddNewCard = (props) => {
 														// reader.onloadend = function () {
 														//     setC(reader.result)
 														// }
-														const formData = new FormData();
-														formData.append("file", file);
-														const token = window.localStorage.getItem("token");
-														if (token) {
-															post(
-																`${variable.uploadFavicon}`,
-																formData,
-																token
-															).then((res) => {
-																setC(res.url);
-															});
-														} else {
-															message.error("用户未登录，更换图标失败");
-														}
+														uploadFileToNas(file)
+															.then((res) => setC(res.url))
+															.catch(() =>
+																message.error("图标上传失败，请稍后重试")
+															);
 														return false;
 													}}
 													maxCount={1}

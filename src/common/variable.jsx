@@ -1,39 +1,21 @@
-const api = "https://api.funtabs.cn";
-// const api = "https://localhost:8081"; //测试地址
+// Xtab 自托管版：所有接口指向同源（我们自己的 NAS 后端），
+// 不再请求原作者服务器 api.funtabs.cn。
+const api = "";
 
 const variable = {
-	login: api + "/api/login",
-	register: api + "/api/register",
-	saveData: api + "/api/saveData",
-	getData: api + "/api/getData",
-	getUserInfo: api + "/api/getUserInfo",
-	uploadImages: api + "/api/uploadWallpaper",
-	uploadFavicon: api + "/api/uploadFavicon",
-	changeUserInfo: api + "/api/changeUserInfo",
-	changePassword: api + "/api/changePassword",
-	deleteUserAccount: api + "/api/deleteUserAccount",
-	getMoreProducts: api + "/api/getMoreProducts",
-	webTitle: api + "/webTitle?url=",
-	getArticleContent: api + "/article?url=",
-	image: api + "/image?url=",
-	favicon: api + "/favicon?url=",
-	hotEvent: api + "/hotEvent",
-	fanyi: api + "/fanyi",
-	funtabsData: api + "/api/getFuntabsDefaultData",
-	getMessage: api + "/api/funtabs/message",
-	saveWebInfo: api + "/api/saveWebInfo",
-	uploadAvatar: api + "/api/uploadAvatar",
-	weather: api + "/weather",
-	festival: api + "/calendar/festival",
-	cityList: api + "/weather/cityList",
-	getAccountBind: api + "/api/accountBind/getUserBind",
-	getEmailCode: api + "/api/accountBind/getCode",
-	bindEmail: api + "/api/accountBind/bindEmail",
-	findPassword: api + "/api/findPassword",
-	personalDomainSet: api + "/api/personalDomainSet",
-	getPersonalDomainSet: api + "/api/personalDomainSet/get",
-	deleteDomain: api + "/api/personalDomainSet/delete",
-	getPersonalData: api + "/api/getPersonalDomainData",
-	randomWallpaper: api + "/wallpaper/random",
+	// 上传（图片/壁纸/图标统一走后端 /api/upload）
+	uploadImages: api + "/api/upload",
+	uploadFavicon: api + "/api/upload",
+	// 抓取网页标题 / 图标（后端代理，解决跨域）
+	webTitle: api + "/api/webtitle?url=",
+	favicon: api + "/api/favicon?url=",
+	// 热搜榜（后端聚合代理）
+	hotEvent: api + "/api/hotEvent",
+	// 翻译（后端代理）
+	fanyi: api + "/api/fanyi",
+	// 中国节假日（timor.tech 公共 API，免费、支持跨域）
+	festival: "https://timor.tech/api/holiday/year/",
+	// 文章卡片内容抓取（后端未实现时会优雅降级，仅影响文章卡片）
+	getArticleContent: api + "/api/article?url=",
 };
 export default variable;

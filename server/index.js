@@ -200,6 +200,223 @@ app.use(
   express.static(UPLOAD_DIR, { maxAge: "30d", immutable: true })
 );
 
+/* ================= Xtab 自托管版新增代理接口 =================
+ * 用于替代原 funtabs 作者服务器的能力，全部数据经由用户自己的 NAS */
+
+const FAVICON_DIR = path.join(DATA_DIR, "favicons");
+fs.mkdirSync(FAVICON_DIR, { recursive: true });
+
+/** 带超时的 fetch（Node 18+ 全局 fetch） */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/json,*/*",
+        ...(options.headers || {}),
+      },
+      redirect: "follow",
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 基础 HTML 实体解码 */
+function decodeEntities(str) {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+/** 抓取网页标题：GET /api/webtitle?url=https://example.com → text/plain */
+app.get("/api/webtitle", auth, async (req, res) => {
+  const target = String(req.query.url || "");
+  if (!/^https?:\/\//i.test(target)) {
+    return res.status(400).json({ error: "invalid_url" });
+  }
+  try {
+    const resp = await fetchWithTimeout(target, {}, 8000);
+    // 只读前 256KB，足够拿到 <head> 里的 title
+    const reader = resp.body.getReader();
+    let received = 0;
+    const chunks = [];
+    while (received < 256 * 1024) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+    }
+    reader.cancel().catch(() => {});
+    const html = Buffer.concat(chunks).toString("utf8");
+    const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+    if (!m) return res.status(404).json({ error: "title_not_found" });
+    res.type("text/plain; charset=utf-8").send(decodeEntities(m[1].trim()));
+  } catch (err) {
+    res.status(502).json({ error: "fetch_failed", message: err.message });
+  }
+});
+
+/** 抓取并缓存网站图标：GET /api/favicon?url=https://example.com → { icon } */
+app.get("/api/favicon", auth, async (req, res) => {
+  const target = String(req.query.url || "");
+  let origin, host;
+  try {
+    const u = new URL(target);
+    if (!/^https?:$/.test(u.protocol)) throw new Error("bad protocol");
+    origin = u.origin;
+    host = u.hostname;
+  } catch {
+    return res.status(400).json({ error: "invalid_url" });
+  }
+  const hash = crypto.createHash("md5").update(host).digest("hex").slice(0, 12);
+
+  // 已有缓存直接返回
+  const cached = fs.readdirSync(FAVICON_DIR).find((f) => f.startsWith(hash));
+  if (cached) return res.json({ icon: `/favicons/${cached}` });
+
+  const candidates = [];
+  // 1) 解析页面 HTML 中的 <link rel="...icon...">
+  try {
+    const resp = await fetchWithTimeout(origin, {}, 6000);
+    const reader = resp.body.getReader();
+    let received = 0;
+    const chunks = [];
+    while (received < 128 * 1024) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+    }
+    reader.cancel().catch(() => {});
+    const html = Buffer.concat(chunks).toString("utf8");
+    const linkRe = /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi;
+    let lm;
+    while ((lm = linkRe.exec(html))) {
+      const hrefM = /href=["']([^"']+)["']/i.exec(lm[0]);
+      if (hrefM) {
+        try {
+          candidates.push(new URL(hrefM[1], origin).href);
+        } catch {}
+      }
+    }
+  } catch {}
+  // 2) 约定位置 3) Google 服务兜底
+  candidates.push(`${origin}/favicon.ico`);
+  candidates.push(
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
+  );
+
+  for (const iconUrl of candidates) {
+    try {
+      const resp = await fetchWithTimeout(iconUrl, {}, 6000);
+      if (!resp.ok) continue;
+      const type = resp.headers.get("content-type") || "";
+      if (!/image|icon|octet-stream/.test(type)) continue;
+      const buf = Buffer.from(await resp.arrayBuffer());
+      if (buf.length < 32) continue; // 过小的多半是无效占位
+      const ext = type.includes("svg")
+        ? "svg"
+        : type.includes("png")
+        ? "png"
+        : type.includes("gif")
+        ? "gif"
+        : "ico";
+      const fileName = `${hash}.${ext}`;
+      await fsp.writeFile(path.join(FAVICON_DIR, fileName), buf);
+      return res.json({ icon: `/favicons/${fileName}` });
+    } catch {}
+  }
+  res.status(404).json({ error: "icon_not_found" });
+});
+
+app.use(
+  "/favicons",
+  express.static(FAVICON_DIR, { maxAge: "30d", immutable: true })
+);
+
+/** 热搜聚合代理：GET /api/hotEvent/:type → { data: [{title,url,hot}] }
+ * 上游为 60s API（开源，可 Docker 自托管）。公共实例限流较严格，
+ * 建议在 NAS 上自托管 vikiboss/60s 镜像后把 HOT_API_BASE 指向内网地址，
+ * 例如 HOT_API_BASE=http://60s:4399/v2 */
+const HOT_API_BASE = (process.env.HOT_API_BASE || "https://60s.viki.moe/v2").replace(/\/$/, "");
+const HOT_EVENT_SOURCES = {
+  weibo: "weibo",
+  douyin: "douyin",
+  bilibili: "bili",
+  toutiao: "toutiao",
+  tieba: "tieba",
+  baidu: "baidu",
+  zhihu: "zhihu",
+  sspai: "sspai",
+};
+/** 上游响应缓存 10 分钟，缓解公共实例限流 */
+const hotCache = new Map(); // type -> { at, data }
+const HOT_CACHE_TTL = 10 * 60 * 1000;
+app.get("/api/hotEvent/:type", auth, async (req, res) => {
+  const source = HOT_EVENT_SOURCES[req.params.type];
+  if (!source) return res.status(400).json({ error: "unknown_type" });
+  const cached = hotCache.get(source);
+  if (cached && Date.now() - cached.at < HOT_CACHE_TTL) {
+    return res.json({ data: cached.data, cached: true });
+  }
+  try {
+    const resp = await fetchWithTimeout(
+      `${HOT_API_BASE}/${source}`,
+      { headers: { Accept: "application/json" } },
+      10000
+    );
+    if (!resp.ok) throw new Error(`upstream ${resp.status}`);
+    const json = await resp.json();
+    const list = Array.isArray(json.data) ? json.data : [];
+    // 60s API 字段为 {title, link, hot_value}，归一化为前端用的 {title, url, hot}
+    const data = list.map((it) => ({
+      title: it.title || "",
+      url: it.link || it.url || it.mobil_url || "",
+      hot: String(it.hot_value ?? it.hot ?? ""),
+    }));
+    hotCache.set(source, { at: Date.now(), data });
+    res.json({ data });
+  } catch (err) {
+    // 有旧缓存时降级返回旧数据而不是报错
+    if (cached) return res.json({ data: cached.data, cached: true, stale: true });
+    res.status(502).json({ error: "hotevent_failed", message: err.message });
+  }
+});
+
+/** 翻译代理：GET /api/fanyi?text=你好 → text/plain（MyMemory 免费 API） */
+app.get("/api/fanyi", auth, async (req, res) => {
+  const text = String(req.query.text || "").slice(0, 500);
+  if (!text) return res.status(400).json({ error: "missing_text" });
+  const hasCJK = /[一-鿿]/.test(text);
+  const langpair = hasCJK ? "zh-CN|en-US" : "en|zh-CN";
+  try {
+    const resp = await fetchWithTimeout(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+        text
+      )}&langpair=${encodeURIComponent(langpair)}`,
+      { headers: { Accept: "application/json" } },
+      8000
+    );
+    if (!resp.ok) throw new Error(`upstream ${resp.status}`);
+    const json = await resp.json();
+    const translated = json?.responseData?.translatedText;
+    if (!translated) throw new Error("empty result");
+    res.type("text/plain; charset=utf-8").send(translated);
+  } catch (err) {
+    res.status(502).json({ error: "translate_failed", message: err.message });
+  }
+});
+
 const buildDir = path.join(__dirname, "..", "build");
 if (fs.existsSync(buildDir)) {
   app.use(express.static(buildDir, { maxAge: "1h" }));

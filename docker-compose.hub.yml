@@ -36,6 +36,10 @@ services:
       # 单 IP 每 5 分钟请求上限，0 表示不限
       - RATE_LIMIT=600
 
+      # 热搜上游：默认 60s 公共实例（限流严格，仅适合轻度使用）。
+      # 启用下方可选的 60s 自托管服务后，改为 http://60s:4399/v2 即可无限额度
+      - HOT_API_BASE=https://60s.viki.moe/v2
+
       # 时区，影响日志与壁纸日期
       - TZ=Asia/Shanghai
 
@@ -57,3 +61,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  # —— 可选：自托管 60s 热搜 API（开源，viki.moe 公共实例限流严格时启用）——
+  # 启用后把上面的 HOT_API_BASE 改为 http://60s:4399/v2
+  # 60s:
+  #   image: vikiboss/60s:latest
+  #   container_name: xtab-60s
+  #   restart: unless-stopped
+  #   expose:
+  #     - "4399"

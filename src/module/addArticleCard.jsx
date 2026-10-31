@@ -1,10 +1,11 @@
+import { uploadFileToNas } from "../common/uploadFile";
 import { UploadOutlined } from "@ant-design/icons";
 import { Button, Col, Empty, Image, Input, Row, Upload, message } from "antd";
 import ImgCrop from "antd-img-crop";
 import React, { useCallback } from "react";
 import ReactMde from "react-mde";
 import "react-mde/lib/styles/css/react-mde-all.css";
-import { get, post } from "../common/fetch";
+import { get } from "../common/fetch";
 import variable from "../common/variable";
 
 const AddArticleCard = React.memo((props) => {
@@ -39,19 +40,9 @@ const AddArticleCard = React.memo((props) => {
 				message.error("文件大小不能超过 5MB！");
 				return false;
 			}
-			const formData = new FormData();
-			formData.append("file", file);
-			const token = window.localStorage.getItem("token");
-			if (token) {
-				try {
-					const res = await post(`${variable.uploadImages}`, formData, token);
-					setArticleCover(res.url);
-				} catch (error) {
-					message.error("用户未登录，上传封面图失败");
-				}
-			} else {
-				message.error("用户未登录，上传封面图失败");
-			}
+			uploadFileToNas(file)
+				.then((res) => setArticleCover(res.url))
+				.catch(() => message.error("封面图上传失败，请稍后重试"));
 			return false;
 		},
 		[setArticleCover]
