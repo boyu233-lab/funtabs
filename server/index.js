@@ -84,7 +84,7 @@ function auth(req, res, next) {
 app.use("/api", rateLimit);
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, service: "funtabs", time: Date.now() });
+  res.json({ ok: true, service: "xtab", time: Date.now() });
 });
 
 app.get("/api/data", auth, async (req, res) => {
@@ -203,7 +203,10 @@ app.use(
 const buildDir = path.join(__dirname, "..", "build");
 if (fs.existsSync(buildDir)) {
   app.use(express.static(buildDir, { maxAge: "1h" }));
-  app.get("*", (req, res) => {
+  // SPA 回退：不用 app.get("*")，Express 5 起该写法非法（需 /*splat），
+  // 用中间件形式可同时兼容 v4 / v5
+  app.use((req, res, next) => {
+    if (req.method !== "GET") return next();
     res.sendFile(path.join(buildDir, "index.html"));
   });
 } else {

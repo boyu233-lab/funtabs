@@ -13,8 +13,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8099
 ENV DATA_DIR=/app/data
-COPY package.json ./
-RUN npm install express --no-audit --no-fund
+# 运行时只装 express。两点注意：
+# 1. 不能把项目的 package.json 复制进来，否则 npm install 会解析整棵依赖树
+#    并因 peer 冲突（react-mde 等）失败
+# 2. 必须锁定 express 4.x：v5 起 app.get("*") 非法，SPA 回退路由会直接崩
+RUN npm init -y > /dev/null && npm install express@^4.19.2 --no-audit --no-fund
 COPY server ./server
 COPY --from=builder /app/build ./build
 RUN mkdir -p /app/data/uploads
