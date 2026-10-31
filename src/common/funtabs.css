@@ -549,6 +549,20 @@
 	margin-left: 2px;
 }
 
+/* 书签即时搜索框：深色壁纸上保证占位符/输入文字/清除按钮可读 */
+.xtab-quick-search input {
+	color: #fff;
+}
+.xtab-quick-search input::placeholder {
+	color: rgba(255, 255, 255, 0.55);
+}
+.xtab-quick-search .anticon-close-circle {
+	color: rgba(255, 255, 255, 0.55);
+}
+.xtab-quick-search:focus-within {
+	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
 /* 左侧导航时给卡片网格区让位（JS 加此类） */
 .gridArea.with-side-tabs {
 	padding-left: 108px;

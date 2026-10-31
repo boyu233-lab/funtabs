@@ -279,6 +279,7 @@ const ShowList = memo((props) => {
 				>
 					<Input
 						allowClear
+						className="xtab-quick-search"
 						prefix={
 							<SearchOutlined style={{ color: "rgba(255,255,255,0.65)" }} />
 						}

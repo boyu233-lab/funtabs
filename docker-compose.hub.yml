@@ -13,6 +13,8 @@ services:
     image: docker.io/boyu233/xtab:latest
     container_name: xtab
     restart: unless-stopped
+    # 每次 up -d 都强制向仓库确认一次，避免本地留着旧的 latest 却一直不更新
+    pull_policy: always
 
     ports:
       # 默认监听所有网卡，Lucky 用 http://127.0.0.1:8099 或 NAS 内网 IP 回源

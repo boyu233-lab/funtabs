@@ -13,7 +13,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { ping } from "../common/nasStore";
-import { VERSION_LABEL, VERSION_TITLE } from "../common/version";
+import { VERSION_LABEL, VERSION_TITLE, APP_VERSION } from "../common/version";
 import {
 	getBaseUrl,
 	getToken,
@@ -32,6 +32,8 @@ export default function SelfHostPanel(props) {
 	const [testing, setTesting] = useState(false);
 	const [status, setStatus] = useState(null); // ok | fail | notset
 	const [secure, setSecure] = useState(true);
+	// 后端真实版本（来自 /api/health），用于区分「容器未更新」与「浏览器缓存」
+	const [serverVer, setServerVer] = useState(null); // string | "fail" | null(加载中)
 
 	useEffect(() => {
 		if (!open) return;
@@ -42,6 +44,12 @@ export default function SelfHostPanel(props) {
 			window.isSecureContext ||
 				["localhost", "127.0.0.1"].includes(window.location.hostname)
 		);
+		// /api/health 无需鉴权；baseUrl 为空时请求当前源
+		setServerVer(null);
+		fetch(`${getBaseUrl() || ""}/api/health`)
+			.then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+			.then((d) => setServerVer(d && d.version ? d.version : "fail"))
+			.catch(() => setServerVer("fail"));
 	}, [open]);
 
 	async function handleTest() {
@@ -122,9 +130,29 @@ export default function SelfHostPanel(props) {
 
 				<Descriptions column={1} size="small" bordered>
 					<Descriptions.Item label="版本">
-						<Text code title={VERSION_TITLE}>
-							{VERSION_LABEL}
-						</Text>
+						<Space size={6} wrap>
+							<Text code title={VERSION_TITLE}>
+								{VERSION_LABEL}
+							</Text>
+							<Text
+								code
+								title="来自后端 /api/health，反映容器实际运行的版本"
+							>
+								后端{" "}
+								{serverVer === null
+									? "获取中…"
+									: serverVer === "fail"
+										? "获取失败"
+										: `v${serverVer}`}
+							</Text>
+							{serverVer &&
+								serverVer !== "fail" &&
+								serverVer !== APP_VERSION && (
+									<Tag color="warning">
+										前后端不一致：容器未更新或页面有缓存
+									</Tag>
+								)}
+						</Space>
 					</Descriptions.Item>
 					<Descriptions.Item label="数据位置">
 						<Text code>{baseUrl || window.location.origin}</Text>
