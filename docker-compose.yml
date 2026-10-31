@@ -1,25 +1,49 @@
+# ============================================================
+# funtabs 部署文件（群晖 + Lucky 反代场景，源码本地构建版）
+# 用法：把仓库源码放到 NAS 的 /volume1/docker/funtabs/
+#       docker compose up -d --build
+# 镜像就绪后请改用 docker-compose.image.yml
+# ============================================================
+
 services:
   funtabs:
     build: .
     image: funtabs:latest
     container_name: funtabs
     restart: unless-stopped
+
     ports:
-      # Lucky 跑在宿主机（host 网络）时，用下面这行只监听本机，避免绕过反代直连
-      # - "127.0.0.1:8099:8099"
-      # Lucky 跑在 Docker bridge 网络时，用容器名互通，可不加 ports 或保留下面这行
+      # 默认监听所有网卡，Lucky 用 http://127.0.0.1:8099 或 NAS 内网 IP 回源
       - "8099:8099"
+      # 若 Lucky 跑在宿主机（host 网络），改成下面这行更安全：
+      # 只监听本机，外部无法绕过反代直连后端
+      # - "127.0.0.1:8099:8099"
+
     environment:
       - PORT=8099
       - DATA_DIR=/app/data
-      # 公网访问必填：与网页「自托管设置」里填的一致
-      # 生成方式：openssl rand -hex 32
-      - API_TOKEN=
-      # 前面挂了群晖反向代理 / nginx / Cloudflare Tunnel 时必须设为 1，
-      # 否则限流会把所有请求当成同一个 IP 而误伤
-      - TRUST_PROXY=0
+
+      # 【必填】公网访问一定要设置，与网页右下角「云图标 → 自托管设置」填的一致
+      # 生成：openssl rand -hex 32
+      - API_TOKEN=请替换成随机长字符串
+
+      # 【必填】前面挂了 Lucky / nginx / Cloudflare Tunnel 时必须设为 1。
+      # 否则服务端看到的来源 IP 全是反代地址，限流会误伤正常访问
+      - TRUST_PROXY=1
+
       # 单 IP 每 5 分钟请求上限，0 表示不限
       - RATE_LIMIT=600
+
+      # 时区，影响日志与壁纸日期
+      - TZ=Asia/Shanghai
+
     volumes:
       # 所有数据都在这个目录里，备份就是把整个 data 目录打包
       - ./data:/app/data
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:8099/api/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
