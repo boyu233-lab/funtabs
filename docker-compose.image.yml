@@ -1,0 +1,28 @@
+# 从镜像仓库部署（不本地构建）
+#
+# 用法：
+#   1. 复制一份为 docker-compose.yml，或直接用 -f 指定本文件
+#   2. 在同目录建 .env 写一行：IMAGE=你的镜像地址
+#      例如 IMAGE=registry.cn-hangzhou.aliyuncs.com/yourns/funtabs:latest
+#   3. docker compose -f docker-compose.image.yml up -d
+#
+# 更新时：docker compose -f docker-compose.image.yml pull && docker compose -f docker-compose.image.yml up -d
+
+services:
+  funtabs:
+    # 镜像地址由 .env 里的 IMAGE 提供，未设置会直接报错而不是误拉 Docker Hub
+    image: ${IMAGE:?请设置 IMAGE=镜像地址，例如 registry.cn-hangzhou.aliyuncs.com/yourns/funtabs:latest}
+    container_name: funtabs
+    restart: unless-stopped
+    # 每次 up 都拉取最新镜像，保证 git pull 后能拿到新版本
+    pull_policy: always
+    ports:
+      - "8099:8099"
+    environment:
+      - PORT=8099
+      - DATA_DIR=/app/data
+      # 建议设置，前端在「设置 - 自托管」里填同样的值
+      - API_TOKEN=
+    volumes:
+      # 所有数据都在这个目录里，备份就是把整个 data 目录打包
+      - ./data:/app/data

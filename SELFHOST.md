@@ -21,7 +21,49 @@ docker compose up -d
 
 访问 `http://<NAS_IP>:8099`。数据落在 `./data/`，备份就是拷贝这个文件。
 
-`docker-compose.yml` 关键配置：
+## 部署方式二：镜像仓库（推荐长期更新）
+
+在本机构建后推送到镜像仓库，NAS 只负责拉取，不用在 NAS 上跑 webpack。
+
+**1）本机构建并推送**
+
+```bash
+docker login registry.cn-hangzhou.aliyuncs.com   # 阿里云 ACR；Docker Hub 用 docker.io
+IMAGE=registry.cn-hangzhou.aliyuncs.com/<命名空间>/funtabs:latest ./scripts/publish-image.sh
+```
+
+**2）NAS 上拉取运行**
+
+在 NAS 建一个目录（如 `docker/funtabs`），放入 `docker-compose.image.yml` 并建 `.env`：
+
+```
+IMAGE=registry.cn-hangzhou.aliyuncs.com/<命名空间>/funtabs:latest
+```
+
+```bash
+docker compose -f docker-compose.image.yml up -d
+```
+
+**3）以后更新**
+
+```bash
+docker compose -f docker-compose.image.yml pull
+docker compose -f docker-compose.image.yml up -d
+```
+
+> 架构提示：脚本默认构建 `linux/amd64`，适用于 x86 群晖（带 + 机型）。
+> 若 NAS 是 ARM 机型，改用 `PLATFORM=linux/arm64 ./scripts/publish-image.sh`
+> （跨架构构建较慢，要求 Docker 已开启 buildx）。
+
+## 镜像仓库选型
+
+| 仓库 | 登录地址 | 特点 |
+|---|---|---|
+| 阿里云 ACR 个人版 | `registry.cn-hangzhou.aliyuncs.com` | 国内拉取快、免费、可设私有，推荐 |
+| Docker Hub | `docker.io` | 最通用，国内 NAS 拉取可能慢或失败 |
+| GHCR | `ghcr.io` | 与 GitHub 仓库打通，国内拉取偏慢 |
+
+`docker-compose.yml` 关键配置（两种部署方式通用）：
 
 | 变量 | 说明 |
 |---|---|
