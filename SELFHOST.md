@@ -283,10 +283,27 @@ python tools/wetab2xtab.py WeTab备份.json --append-to /volume1/docker/xtab/dat
 **第三步：导入**
 Xtab → 顶栏「更多」→「备份恢复数据」→「上传 YAML 写入 NAS」。
 
+**已实测支持的结构（WeTab 2.2.50 / branch zh）**
+
+```json
+{"version":"2.2.50","branch":"zh","data":{"store-icon":{"icons":[
+    {"name":"主页","id":"category-xxx","children":[
+        {"type":"site","name":"火山写作","target":"https://...","bgImage":"..."},
+        {"type":"widget","name":"天气","widgetName":"widget-weather"}
+    ]}
+]}}}
+```
+
+要点：
+- 链接字段是 **`target`**（不是 `url`），标题字段是 `name`
+- 只认 `store-icon.icons` 这一条路径，`store-wallpaper.src`、组件背景图等图片地址**不会被误当成书签**
+- `type: "widget"` 的小组件（天气 / 日历 / 热搜 / AI / 换算器 / 纪念日 / 书签管理）一律跳过——Xtab 本身已有热搜与天气卡片，无需迁移
+- 标题为空的站点（WeTab 允许只填网址）会用域名兜底作为显示名
+
 **注意**
 - 上传会**整体覆盖** NAS 上的现有数据，操作前先点「下载 YAML」备份一份。
 - 用 `--append-to` 时脚本只做文本追加，改完同样需要上传回去才生效。
-- 若脚本报告「没有解析出任何书签」，说明该备份结构超出自动识别范围，把导出文件发来补一条专用解析规则即可。
+- 若脚本报告「没有解析出任何书签」，说明该备份结构超出识别范围（版本差异或 iTab 分支），把导出文件发来补规则即可——脚本会先走精确解析，失败再回退全文档探测。
 
 ## 相对于上游的改动
 

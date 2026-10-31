@@ -50,16 +50,19 @@ DEFAULT_LAYOUT = {
 }
 
 # 判定为"链接"的字段：值非空字符串即可
-URL_KEYS = ("url", "link", "href", "src", "site", "web", "address")
+# 注意 target 是 WeTab 实际使用的字段名（2.2.x 备份里站点链接存在 target 上）
+URL_KEYS = ("url", "link", "href", "src", "target", "site", "web", "address")
 # 判定为"标题"的字段
 TITLE_KEYS = ("label", "title", "name", "text", "siteName", "nickname")
 # 判定为"图标"的字段
-ICON_KEYS = ("icon", "favicon", "ico", "logo", "img", "image")
+ICON_KEYS = ("icon", "favicon", "ico", "logo", "img", "image", "bgImage")
 # 判定为"子项"的字段（数组）
 CHILD_KEYS = (
     "children", "child", "items", "list", "sites", "data",
-    "subs", "sub", "content", "bookmarks", "links", "navs", "folders",
+    "subs", "sub", "content", "bookmarks", "links", "navs", "folders", "icons",
 )
+# 这些既不是书签也不是分类，是页面上的小组件（天气/日历/热搜/AI 等），一律跳过
+WIDGET_TYPES = ("widget", "app", "plugin", "addon", "extension")
 
 
 # ------------------------- YAML 序列化（无第三方依赖） -------------------------
@@ -208,6 +211,9 @@ def walk(node, category, buckets, depth=0):
         return
     if not isinstance(node, dict):
         return
+    # 小组件（天气/日历/热搜等）不是书签
+    if _is_widget(node):
+        return
 
     url = node_url(node)
     if url:
@@ -235,6 +241,87 @@ def walk(node, category, buckets, depth=0):
     else:
         # 叶子但没有链接：可能是被折叠的其他类型数据，忽略
         return
+
+
+def _is_widget(node):
+    """小组件（天气/日历/热搜/AI/书签管理等）不是书签，必须排除"""
+    if not isinstance(node, dict):
+        return False
+    if str(node.get("type", "")).lower() in WIDGET_TYPES:
+        return True
+    # 有些版本没有 type，但带 widgetName / widgetData
+    if node.get("widgetName") or node.get("widgetData"):
+        return True
+    return False
+
+
+def domain_of(url):
+    """从 URL 取主机名，用于标题为空时兜底"""
+    m = re.match(r"^https?://([^/?#]+)", url.strip(), re.I)
+    if not m:
+        return url.strip()
+    host = m.group(1)
+    if "@" in host:  # 去掉 user:pass@
+        host = host.split("@", 1)[1]
+    return host
+
+
+def parse_wetab(doc):
+    """
+    WeTab 专用精确解析器。
+
+    实测结构（WeTab 2.2.50 / branch zh）：
+      {"version":"2.2.50","data":{"store-icon":{"icons":[
+          {"name":"主页","id":"category-xxx","children":[
+              {"type":"site","name":"火山写作","target":"https://...","bgImage":"..."},
+              {"type":"widget","name":"天气","widgetName":"widget-weather", ...}
+          ]}
+      ]}}}
+
+    为什么不直接用通用 walk()：备份里还有 store-wallpaper.src、
+    组件背景图等一堆图片地址，全文档启发式会把壁纸也当成书签收进来。
+    这里只认 store-icon.icons 这一条确切路径。
+    """
+    if not isinstance(doc, dict):
+        return {}
+
+    # icons 可能在顶层，也可能在 data / data["store-icon"] 下
+    icons = None
+    for root in (doc, doc.get("data") if isinstance(doc.get("data"), dict) else None):
+        if not isinstance(root, dict):
+            continue
+        si = root.get("store-icon")
+        if isinstance(si, dict) and isinstance(si.get("icons"), list):
+            icons = si["icons"]
+            break
+        if isinstance(root.get("icons"), list):
+            icons = root["icons"]
+            break
+    if icons is None:
+        return {}
+
+    buckets = {}
+    for cat in icons:
+        if not isinstance(cat, dict):
+            continue
+        cat_name = (cat.get("name") or cat.get("title") or "").strip() or "未分类"
+        children = cat.get("children")
+        if not isinstance(children, list):
+            continue
+        for ch in children:
+            if _is_widget(ch):
+                continue
+            url = node_url(ch)
+            if not url or not url.lower().startswith(("http://", "https://")):
+                continue
+            label = node_title(ch, "").strip()
+            if not label:
+                # WeTab 允许标题为空（例如只填了网址），用域名兜底
+                label = domain_of(url)
+            buckets.setdefault(cat_name, []).append({
+                "label": label, "link": url, "icon": None,
+            })
+    return buckets
 
 
 def parse_html(raw):
@@ -378,9 +465,14 @@ def main():
         buckets = parse_html(data)
         src = "浏览器书签 HTML"
     else:
-        buckets = {}
-        walk(data, "导入的书签", buckets)
-        src = "WeTab JSON"
+        # 先走 WeTab 专用精确解析：只认 store-icon.icons，
+        # 避免把壁纸、组件背景图等图片地址误当成书签
+        buckets = parse_wetab(data)
+        src = "WeTab JSON（精确路径）"
+        if not buckets:
+            # 结构对不上（版本差异 / iTab 等），回退到全文档启发式
+            walk(data, "导入的书签", buckets)
+            src = "JSON（结构未识别，已回退通用探测）"
 
     buckets, removed = dedup(buckets)
     total = sum(len(v) for v in buckets.values())
