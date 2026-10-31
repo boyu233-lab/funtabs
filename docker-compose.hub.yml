@@ -25,6 +25,10 @@ services:
       - PORT=8099
       - DATA_DIR=/app/data
 
+      # 主数据文件格式：yaml（默认，人工可编辑，推荐）/ json（旧版兼容）
+      # 首次启动若目标格式文件不存在，会自动从另一种格式转换过来，原文件保留
+      - DATA_FORMAT=yaml
+
       # 【必填】公网访问必须设置，与网页右下角「云图标 → 自托管设置」填的一致
       # 生成：openssl rand -hex 32
       - API_TOKEN=请替换成随机长字符串
@@ -46,7 +50,8 @@ services:
     volumes:
       # —— 所有数据都存在这里，备份就是把整个 data 目录打包 ——
       # 容器内结构：
-      #   /app/data/funtabs.json    书签/配置的真相源（原子写，另有 .bak 备份）
+      #   /app/data/funtabs.yaml    书签/配置的真相源（默认 YAML，原子写，另有 .bak）
+      #   /app/data/funtabs.json    DATA_FORMAT=json 时使用（首次启动会自动互转）
       #   /app/data/uploads/        上传的图片、壁纸（只存文件，不存 base64）
       #
       # 建议首次启动前先创建（避免 Docker 以 root 自动创建导致权限问题）：

@@ -17,6 +17,7 @@ import Paragraph from "antd/es/typography/Paragraph";
 import Dragger from "antd/es/upload/Dragger";
 import _ from "lodash";
 import React, { useEffect, useState } from "react";
+import { pushToNas } from "../common/dataIO";
 import mergeArr from "../common/mergeArr";
 import transformToJson from "../common/transformToJson";
 import { funtabsData } from "./data";
@@ -123,10 +124,18 @@ function Bookmarks(props) {
 			const targetKey = targetItem ? targetItem.key : result[0].key;
 			setTabsActiveKey(targetKey);
 			window.localStorage.setItem("activeKey", targetKey);
-			message.success(`导入成功，新增 ${addNum} 项，去重 ${removeNum} 项`);
 			setLinkList(result);
 			saveLinkList(result);
 			setOpen(false);
+			message.success(`导入成功，新增 ${addNum} 项，去重 ${removeNum} 项`);
+			// 自托管下必须回写 NAS，否则刷新后数据会被 NAS 上的旧版本覆盖
+			pushToNas().then((res) => {
+				if (res.ok) message.success("已同步到 NAS");
+				else
+					message.warning(
+						res.message || "已保存到本机，联网后会自动补传到 NAS"
+					);
+			});
 		} else {
 			message.error("不支持导入到自由全屏模式中");
 		}

@@ -67,6 +67,16 @@ function lsSet(key, value) {
   }
 }
 
+async function idbDel(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function cacheGet(key) {
   try {
     const val = await idbGet(key);
@@ -84,4 +94,19 @@ export async function cacheSet(key, value) {
   } catch (e) {
     return lsSet(key, value);
   }
+}
+
+/** 清空离线缓存（重置数据时使用），IndexedDB 与 localStorage 兜底都清掉 */
+export async function cacheClear(key) {
+  try {
+    await idbDel(key);
+  } catch (e) {
+    /* 忽略 */
+  }
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    /* 忽略 */
+  }
+  return true;
 }

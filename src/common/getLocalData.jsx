@@ -7,6 +7,8 @@ export default function getLocalData() {
 	}
 
 	// 针对需要保留下来的特定前缀使用 filter() 函数过滤
+	// 注意：这里同时是"合法键"名单，未列出的键会被下面的清理逻辑删除，
+	// 新增任何 localStorage 配置都必须同步登记，否则会在备份/导出时被误删。
 	const validKeys = allKeys.filter(
 		(key) =>
 			key.startsWith("time") ||
@@ -17,7 +19,12 @@ export default function getLocalData() {
 			key.startsWith("weather_") ||
 			key.startsWith("festival_") ||
 			key.startsWith("data_weather_") ||
+			key.startsWith("om_weather_") ||
+			key.startsWith("om_geo_") ||
 			key === "token" ||
+			key === "nasBaseUrl" ||
+			key === "nasToken" ||
+			key === "dailyWallpaper" ||
 			key === "brightness" ||
 			key === "funtabs" ||
 			key === "showClock" ||
@@ -68,7 +75,10 @@ export default function getLocalData() {
 			for (var i = 0; i < localStorage.length; i++) {
 				data[localStorage.key(i)] = localStorage.getItem(localStorage.key(i));
 			}
+			// 自托管地址属于本机配置，不随备份导出；Token 属于凭据，绝不能写进备份文件
 			delete data["token"];
+			delete data["nasBaseUrl"];
+			delete data["nasToken"];
 			delete data["activeKey"];
 			for (const key in data) {
 				if (

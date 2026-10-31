@@ -1,18 +1,25 @@
 /**
  * Xtab 自托管后端
- * 数据真相源是 NAS 磁盘上的 data/funtabs.json，浏览器本地只是离线缓存。
+ * 数据真相源是 NAS 磁盘上的数据文件（默认 YAML，可选 JSON），
+ * 浏览器本地只是离线缓存。
  */
 // 发版时与 src/common/version.js、package.json 的 version 保持同步
-const APP_VERSION = "1.0.2";
+const APP_VERSION = "1.1.0";
 const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
+// YAML 解析/序列化：把书签整理成人工可编辑的结构，方便备份、diff 与批量修改
+const YAML = require("yaml");
 
 const PORT = parseInt(process.env.PORT || "8099", 10);
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "..", "data");
-const DATA_FILE = path.join(DATA_DIR, "funtabs.json");
+// 主数据格式：yaml（默认，人工可编辑）| json（兼容旧版）
+const DATA_FORMAT = (process.env.DATA_FORMAT || "yaml").toLowerCase();
+const YAML_FILE = path.join(DATA_DIR, "funtabs.yaml");
+const JSON_FILE = path.join(DATA_DIR, "funtabs.json");
+const DATA_FILE = DATA_FORMAT === "json" ? JSON_FILE : YAML_FILE;
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 const API_TOKEN = process.env.API_TOKEN || "";
 const MAX_BODY = process.env.MAX_BODY || "20mb";
@@ -30,27 +37,135 @@ const app = express();
 app.set("trust proxy", TRUST_PROXY);
 app.use(express.json({ limit: MAX_BODY }));
 
-/** 原子写：先写临时文件再 rename，避免写一半断电导致数据损坏 */
-async function writeJsonAtomic(file, obj) {
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await fsp.writeFile(tmp, JSON.stringify(obj), "utf8");
-  await fsp.rename(tmp, file);
+/* ============ 数据文件读写：YAML / JSON 双格式 ============ */
+
+/**
+ * 内部结构 doc = { data: newData, updatedAt, version }
+ * 其中 newData = { content: [tab...], ...布局字段 }
+ *
+ * YAML 采用更适合人工编辑的形状：
+ *   version / updatedAt / layout（布局字段）/ tabs（分类，内含 items）
+ */
+function docToYamlText(doc) {
+  const d = (doc && doc.data) || {};
+  const layout = {};
+  Object.keys(d).forEach((k) => {
+    if (k !== "content") layout[k] = d[k];
+  });
+  const tabs = Array.isArray(d.content)
+    ? d.content.map((tab) => {
+        const meta = {};
+        Object.keys(tab || {}).forEach((k) => {
+          if (k !== "content") meta[k] = tab[k];
+        });
+        return { ...meta, items: Array.isArray(tab.content) ? tab.content : [] };
+      })
+    : [];
+  return YAML.stringify(
+    {
+      version: (doc && doc.version) || 1,
+      updatedAt: (doc && doc.updatedAt) || 0,
+      layout,
+      tabs,
+    },
+    { indent: 2, lineWidth: 0 }
+  );
 }
 
+/** 数字型 key/字段在 YAML 里可能被写成字符串，这里统一还原成数字 */
+function normalizeScalar(v) {
+  if (typeof v === "string" && v.trim() !== "" && /^-?\d+$/.test(v.trim())) {
+    return Number(v.trim());
+  }
+  return v;
+}
+
+function yamlTextToDoc(text) {
+  const obj = YAML.parse(text) || {};
+  const layout = obj.layout || {};
+  const tabs = Array.isArray(obj.tabs) ? obj.tabs : [];
+  const content = tabs.map((tab, i) => {
+    const meta = {};
+    Object.keys(tab || {}).forEach((k) => {
+      if (k !== "items") meta[k] = tab[k];
+    });
+    meta.key = normalizeScalar(meta.key !== undefined ? meta.key : i + 1);
+    if (!meta.type) meta.type = "folder";
+    return { ...meta, content: Array.isArray(tab.items) ? tab.items : [] };
+  });
+  const data = {};
+  Object.keys(layout).forEach((k) => {
+    data[k] = k === "content" ? layout[k] : layout[k];
+  });
+  data.content = content;
+  return {
+    data,
+    updatedAt: Number(obj.updatedAt) || Date.now(),
+    version: Number(obj.version) || 1,
+  };
+}
+
+async function readRaw(file) {
+  return fsp.readFile(file, "utf8");
+}
+
+/** 读取当前数据文档；主文件损坏时回退 .bak */
 async function readData() {
   try {
-    const raw = await fsp.readFile(DATA_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    return parsed;
+    const raw = await readRaw(DATA_FILE);
+    if (DATA_FORMAT === "json") return JSON.parse(raw);
+    return yamlTextToDoc(raw);
   } catch (err) {
     if (err.code === "ENOENT") return null;
-    // 主文件损坏时尝试回滚到备份
     try {
-      const backup = await fsp.readFile(`${DATA_FILE}.bak`, "utf8");
-      return JSON.parse(backup);
+      const backup = await readRaw(`${DATA_FILE}.bak`);
+      if (DATA_FORMAT === "json") return JSON.parse(backup);
+      return yamlTextToDoc(backup);
     } catch (_) {
       throw err;
     }
+  }
+}
+
+/** 原子写（先写临时文件再 rename），格式由当前 DATA_FORMAT 决定 */
+async function writeDoc(doc) {
+  const text =
+    DATA_FORMAT === "json"
+      ? JSON.stringify(doc, null, 2)
+      : docToYamlText(doc);
+  const tmp = `${DATA_FILE}.${process.pid}.${Date.now()}.tmp`;
+  await fsp.writeFile(tmp, text, "utf8");
+  await fsp.rename(tmp, DATA_FILE);
+}
+
+/**
+ * 首次启动时做一次格式迁移：
+ * 目标格式文件不存在、而另一种格式存在时，自动转换，原文件保留不动。
+ */
+async function migrateIfNeeded() {
+  const target = DATA_FILE;
+  const other = DATA_FORMAT === "json" ? YAML_FILE : JSON_FILE;
+  try {
+    await fsp.access(target);
+    return; // 目标文件已存在，无需迁移
+  } catch (_) {
+    /* 继续 */
+  }
+  let doc = null;
+  try {
+    const raw = await readRaw(other);
+    doc = other === JSON_FILE ? JSON.parse(raw) : yamlTextToDoc(raw);
+  } catch (_) {
+    return;
+  }
+  if (!doc || !doc.data) return;
+  try {
+    await writeDoc(doc);
+    console.log(
+      `[xtab] 已将 ${path.basename(other)} 迁移为 ${path.basename(target)}（原文件保留）`
+    );
+  } catch (e) {
+    console.error(`[xtab] 数据格式迁移失败：${e.message}`);
   }
 }
 
@@ -90,6 +205,7 @@ app.get("/api/health", (req, res) => {
     ok: true,
     service: "xtab",
     version: APP_VERSION,
+    dataFormat: DATA_FORMAT,
     time: Date.now(),
   });
 });
@@ -125,19 +241,91 @@ app.put("/api/data", auth, async (req, res) => {
         server: current,
       });
     }
-    // 保留上一版本作备份
+    // 保留上一版本作备份（格式与主文件一致，方便直接查看/回滚）
     if (current) {
-      await fsp
-        .writeFile(`${DATA_FILE}.bak`, JSON.stringify(current), "utf8")
-        .catch(() => {});
+      const bakText =
+        DATA_FORMAT === "json"
+          ? JSON.stringify(current, null, 2)
+          : docToYamlText(current);
+      await fsp.writeFile(`${DATA_FILE}.bak`, bakText, "utf8").catch(() => {});
     }
     const doc = {
       data: body.data,
       updatedAt: Date.now(),
       version: (current && current.version ? current.version : 0) + 1,
     };
-    await writeJsonAtomic(DATA_FILE, doc);
+    await writeDoc(doc);
     res.json({ ok: true, ...doc });
+  } catch (err) {
+    res.status(500).json({ error: "write_failed", message: err.message });
+  }
+});
+
+/**
+ * 导出原始数据文件（不经过前端 localStorage，导出的一定是 NAS 上的真相源）
+ * GET /api/data/raw?format=yaml|json
+ */
+app.get("/api/data/raw", auth, async (req, res) => {
+  const format = (req.query.format || DATA_FORMAT).toLowerCase();
+  try {
+    const doc = await readData();
+    if (!doc) return res.status(404).json({ error: "no_data" });
+    const isYaml = format !== "json";
+    const text = isYaml ? docToYamlText(doc) : JSON.stringify(doc, null, 2);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    res.set("Content-Type", isYaml ? "text/yaml; charset=utf-8" : "application/json; charset=utf-8");
+    res.set(
+      "Content-Disposition",
+      `attachment; filename="xtab-${stamp}.${isYaml ? "yaml" : "json"}"`
+    );
+    res.send(text);
+  } catch (err) {
+    res.status(500).json({ error: "export_failed", message: err.message });
+  }
+});
+
+/**
+ * 导入 YAML / JSON 文本并直接写入 NAS（供前端"导入文件"按钮使用）
+ * POST /api/data/import  body: { content: "...", format?: "yaml"|"json" }
+ */
+app.post("/api/data/import", auth, async (req, res) => {
+  const body = req.body || {};
+  const content = typeof body.content === "string" ? body.content : "";
+  if (!content.trim()) {
+    return res.status(400).json({ error: "empty_content" });
+  }
+  const format = (body.format || DATA_FORMAT).toLowerCase();
+  let doc;
+  try {
+    if (format === "json") {
+      const parsed = JSON.parse(content);
+      // 兼容两种 JSON：完整 doc {data,...} 或直接是 newData
+      doc = parsed && parsed.data ? parsed : { data: parsed };
+    } else {
+      doc = yamlTextToDoc(content);
+    }
+  } catch (err) {
+    return res.status(400).json({ error: "parse_failed", message: err.message });
+  }
+  if (!doc || !doc.data || typeof doc.data !== "object") {
+    return res.status(400).json({ error: "invalid_structure" });
+  }
+  try {
+    const current = await readData();
+    if (current) {
+      const bakText =
+        DATA_FORMAT === "json"
+          ? JSON.stringify(current, null, 2)
+          : docToYamlText(current);
+      await fsp.writeFile(`${DATA_FILE}.bak`, bakText, "utf8").catch(() => {});
+    }
+    const next = {
+      data: doc.data,
+      updatedAt: Date.now(),
+      version: (current && current.version ? current.version : 0) + 1,
+    };
+    await writeDoc(next);
+    res.json({ ok: true, ...next });
   } catch (err) {
     res.status(500).json({ error: "write_failed", message: err.message });
   }
@@ -457,7 +645,11 @@ if (fs.existsSync(buildDir)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`[funtabs] 服务已启动 http://0.0.0.0:${PORT}`);
-  console.log(`[funtabs] 数据目录 ${DATA_DIR}`);
-});
+migrateIfNeeded()
+  .catch((e) => console.error(`[xtab] 迁移检查失败：${e.message}`))
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`[xtab] 服务已启动 http://0.0.0.0:${PORT}（v${APP_VERSION}）`);
+      console.log(`[xtab] 数据文件 ${DATA_FILE}（格式：${DATA_FORMAT}）`);
+    });
+  });

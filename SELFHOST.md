@@ -199,6 +199,8 @@ npm run server    # 启动后端，托管 build/ 静态文件
 | GET | `/api/webtitle?url=` | 抓取目标网页标题（添加书签时自动填标题） |
 | GET | `/api/favicon?url=` | 抓取并缓存网站图标到 `data/favicons/`，返回本地 URL |
 | GET | `/api/hotEvent/:type` | 热搜聚合（weibo/douyin/bili/toutiao/tieba/baidu/zhihu/sspai），上游为 60s API，可用 `HOT_API_BASE` 指向自托管实例 |
+| GET | `/api/data/raw?format=yaml\|json` | 下载 NAS 上的原始数据文件，导出的一定是真相源 |
+| POST | `/api/data/import` | 上传 YAML/JSON 文本，服务端解析校验后写入 |
 | GET | `/api/fanyi?text=` | 翻译代理（MyMemory 免费 API，自动识别中英互译） |
 
 > 以上接口已完全替代原作者服务器 api.funtabs.cn 的对应能力；
@@ -206,6 +208,56 @@ npm run server    # 启动后端，托管 build/ 静态文件
 
 写入时若客户端 `updatedAt` 与服务端不一致会返回 `409` 并附带服务端版本，
 前端据此提示冲突；`force=1` 可强制覆盖。
+
+## 数据文件：YAML（推荐）或 JSON
+
+主数据文件就是 NAS 上的 **`data/funtabs.yaml`**，可直接用文本编辑器批量改网址，
+也能放进 git 做版本管理。结构如下：
+
+```yaml
+version: 4
+updatedAt: 1730361600000
+layout:            # 卡片与网格布局
+  widthNum: 160
+  heightNum: 64
+  cardStyle: defaultCard
+  radius: 12
+tabs:              # 分类
+  - key: 0
+    label: 常用
+    type: folder
+    items:         # 该分类下的网址
+      - label: 百度
+        link: https://www.baidu.com
+        type: link
+        size: "11"
+```
+
+**改完如何生效**（两种方式任选）：
+
+1. 网页「关于 → 备份/恢复数据 → 下载 YAML / 上传 YAML 写入 NAS」
+2. 命令行直连接口（公网需带 Token）：
+
+```bash
+# 导出
+curl -H "Authorization: Bearer 你的TOKEN" \
+  "https://你的域名/api/data/raw?format=yaml" -o funtabs.yaml
+
+# 导入（把文件内容作为 JSON 字符串的 content 字段提交）
+python - <<'PY'
+import json, urllib.request
+content = open("funtabs.yaml", encoding="utf-8").read()
+req = urllib.request.Request(
+    "https://你的域名/api/data/import",
+    data=json.dumps({"format": "yaml", "content": content}).encode(),
+    headers={"Content-Type": "application/json", "Authorization": "Bearer 你的TOKEN"},
+)
+print(urllib.request.urlopen(req).read().decode()[:200])
+PY
+```
+
+**格式切换**：环境变量 `DATA_FORMAT=yaml`（默认）或 `json`。首次启动时若目标格式文件不存在，
+会自动从另一种格式转换过来，**原文件保留不删**。每次写入都会另存一份上一版本 `funtabs.yaml.bak`。
 
 ## 相对于上游的改动
 

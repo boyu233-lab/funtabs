@@ -31,6 +31,55 @@ docker images --digests | grep xtab
 
 ---
 
+## [1.1.0] — 2026-10-31
+
+### 新增：YAML 主数据文件（对标 homepage 的可编辑配置）
+- 数据文件默认改为 **`/app/data/funtabs.yaml`**，结构与 homepage 类似，人工可读可改：
+  ```yaml
+  version: 1
+  updatedAt: 1730361600000
+  layout:
+    cardStyle: defaultCard
+    widthNum: 160
+    heightNum: 64
+  tabs:
+    - key: 0
+      label: 常用
+      type: folder
+      items:
+        - label: 百度
+          link: https://www.baidu.com
+          type: link
+  ```
+- 新增环境变量 `DATA_FORMAT=yaml|json`（默认 yaml）；首次启动若目标格式文件不存在，
+  会自动从另一种格式转换过来，**原文件保留不删**
+- 新增接口：`GET /api/data/raw?format=yaml|json`（直接下载 NAS 原始文件）、
+  `POST /api/data/import`（上传 YAML/JSON 文本由服务端解析写入）
+- 前端「备份/恢复数据」新增「下载 YAML」「上传 YAML 写入 NAS」两个入口
+- `/api/health` 增加 `dataFormat` 字段
+- Dockerfile 运行时增加 `yaml` 依赖
+
+### 修复：导入导出与备份恢复在自托管下的失效问题
+- **恢复的数据不会写回 NAS**：原实现只写 localStorage，刷新时 NAS 会把旧数据推回来，
+  表现为"导入无效"。现在恢复/导入/重置全部走新的 `pushToNas()`（force 覆盖）
+- **打开备份弹窗会清空自托管配置**：`getLocalData()` 会把不在白名单的键删除，
+  而 `nasBaseUrl` / `nasToken` / `dailyWallpaper` 都没登记，
+  结果就是打开一次备份弹窗，NAS 地址与 Token 被清空、同步直接 401。
+  已补齐白名单，且导出时不包含 Token 等凭据
+- **重置数据在自托管下完全无效**：只清了 localStorage，现已改为把默认数据写回 NAS
+  + 清空离线缓存，并加了危险操作提示
+- **导入浏览器书签后不同步 NAS**（刷新即丢）：合并完成后自动回写
+- 导出文件名含 `:`（`toISOString()`），Windows 下载会被系统改名或失败 → 改为 `2026-10-31_19-20-33`
+- 导出"浏览器书签 HTML"时内容是 JSON 转义后的字符串（带引号与反斜杠），不可直接导入浏览器
+  → 改为直接输出原始 HTML
+- 导入无校验、且先 `localStorage.clear()`，误粘贴任意 JSON 就会清空数据 →
+  新增 `validateImport()` 结构校验，并保留自托管配置
+- 导入时的 `JSON.parse` reviver 会把 ISO 时间字符串转成 Date 对象，
+  再 `setItem` 后变成 `Mon Oct 31 2026 ...` 格式，破坏部分字段 → 已移除
+- 新增 `src/common/dataIO.js` 统一数据出入口；`idbCache` 增加 `cacheClear()`
+
+---
+
 ## [1.0.2] — 2026-10-31
 
 ### 移除
