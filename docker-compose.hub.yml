@@ -1,0 +1,59 @@
+# ============================================================
+# Xtab 部署文件 —— Docker Hub 镜像版（NAS 上不编译，直接拉取）
+#
+# 用法：放到 NAS 的 /volume1/docker/xtab/ 目录，然后
+#         docker compose -f docker-compose.hub.yml up -d
+# ============================================================
+
+name: xtab
+
+services:
+  xtab:
+    # 镜像地址，等推送完成后把 USERNAME 换成实际的 Docker Hub 用户名
+    image: docker.io/USERNAME/xtab:latest
+    container_name: xtab
+    restart: unless-stopped
+
+    ports:
+      # 默认监听所有网卡，Lucky 用 http://127.0.0.1:8099 或 NAS 内网 IP 回源
+      - "8099:8099"
+      # 若 Lucky 跑在宿主机（host 网络），改成下面这行更安全：
+      # 外部无法绕过反代直连后端
+      # - "127.0.0.1:8099:8099"
+
+    environment:
+      - PORT=8099
+      - DATA_DIR=/app/data
+
+      # 【必填】公网访问必须设置，与网页右下角「云图标 → 自托管设置」填的一致
+      # 生成：openssl rand -hex 32
+      - API_TOKEN=请替换成随机长字符串
+
+      # 【必填】前面挂了 Lucky / nginx / Cloudflare Tunnel 时必须为 1。
+      # 否则服务端看到的来源 IP 全是反代地址，限流会误伤正常访问
+      - TRUST_PROXY=1
+
+      # 单 IP 每 5 分钟请求上限，0 表示不限
+      - RATE_LIMIT=600
+
+      # 时区，影响日志与壁纸日期
+      - TZ=Asia/Shanghai
+
+    volumes:
+      # —— 所有数据都存在这里，备份就是把整个 data 目录打包 ——
+      # 容器内结构：
+      #   /app/data/funtabs.json    书签/配置的真相源（原子写，另有 .bak 备份）
+      #   /app/data/uploads/        上传的图片、壁纸（只存文件，不存 base64）
+      #
+      # 建议首次启动前先创建（避免 Docker 以 root 自动创建导致权限问题）：
+      #   mkdir -p /volume1/docker/xtab/data
+      - /volume1/docker/xtab/data:/app/data
+      # 也可以改成相对路径（相对本文件所在目录，Docker 会自动创建）：
+      # - ./data:/app/data
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:8099/api/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
