@@ -684,7 +684,7 @@ const AddNewCard = (props) => {
 												>
 													<img
 														className=""
-														alt="funtabs｜趣标签页，给你不一样的浏览器起始页"
+														alt="Xtab 标签页"
 														src={item.img}
 														style={{
 															width: "auto",

@@ -102,8 +102,12 @@ const Header = (props) => {
 		{
 			key: "home",
 			label: (
-				<a href="https://www.funtabs.cn" target={linkOpen} rel="noreferrer">
-					趣标签页官网
+				<a
+					href="https://github.com/boyu233-lab/funtabs"
+					target={linkOpen}
+					rel="noreferrer"
+				>
+					Xtab 项目
 				</a>
 			),
 			icon: <HomeFilled />,
@@ -177,9 +181,9 @@ const Header = (props) => {
 						addonAfter={
 							<RedoOutlined
 								onClick={() => {
-									setTitle("趣标签页");
-									document.title = "趣标签页";
-									window.localStorage.setItem("webTitle", "趣标签页");
+									setTitle("Xtab");
+									document.title = "Xtab";
+									window.localStorage.setItem("webTitle", "Xtab");
 								}}
 							/>
 						}

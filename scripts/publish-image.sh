@@ -9,12 +9,12 @@
 #        docker login ghcr.io                                # GitHub 仓库
 #
 # 用法：
-#   IMAGE=registry.cn-hangzhou.aliyuncs.com/yourns/funtabs:latest ./scripts/publish-image.sh
-#   不带 IMAGE 时默认使用本地名 funtabs:latest（只构建不推送）
+#   IMAGE=registry.cn-hangzhou.aliyuncs.com/yourns/xtab:latest ./scripts/publish-image.sh
+#   不带 IMAGE 时默认使用本地名 xtab:latest（只构建不推送）
 
 set -euo pipefail
 
-IMAGE="${IMAGE:-funtabs:latest}"
+IMAGE="${IMAGE:-xtab:latest}"
 PLATFORM="${PLATFORM:-linux/amd64}"
 
 cd "$(dirname "$0")/.."
@@ -29,5 +29,5 @@ if [[ "${IMAGE}" == *"/"* ]]; then
   echo "==> 完成，NAS 上执行：docker pull ${IMAGE}"
 else
   echo "==> 未检测到仓库地址，已跳过推送（仅本地构建）"
-  echo "==> 需要推送请设置 IMAGE=仓库地址/命名空间/funtabs:latest"
+  echo "==> 需要推送请设置 IMAGE=仓库地址/命名空间/xtab:latest"
 fi

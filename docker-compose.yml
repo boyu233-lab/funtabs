@@ -8,8 +8,8 @@
 services:
   funtabs:
     build: .
-    image: funtabs:latest
-    container_name: funtabs
+    image: xtab:latest
+    container_name: xtab
     restart: unless-stopped
 
     ports:

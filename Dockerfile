@@ -1,8 +1,9 @@
 # 阶段一：构建前端
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
+# .npmrc 必须和安装命令同一批复制进来，否则 npm install 阶段读不到 legacy-peer-deps
+COPY package.json package-lock.json* .npmrc* ./
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 COPY . .
 RUN npm run build
 

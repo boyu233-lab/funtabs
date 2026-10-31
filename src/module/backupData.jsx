@@ -57,7 +57,7 @@ function BackupData() {
 				const objectURL = URL.createObjectURL(blob);
 				const aTag = document.createElement("a");
 				aTag.href = objectURL;
-				aTag.download = `funtabs趣标签页备份数据${new Date().toISOString()}.${styleCheck}`;
+				aTag.download = `Xtab备份数据${new Date().toISOString()}.${styleCheck}`;
 				aTag.click();
 				URL.revokeObjectURL(objectURL);
 				message.success("数据导出本地成功，请妥善保存！");

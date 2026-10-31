@@ -1,28 +1,17 @@
 <!DOCTYPE html>
 <html>
-	<script>
-		var _hmt = _hmt || [];
-		(function () {
-			var hm = document.createElement("script");
-			hm.src = "https://hm.baidu.com/hm.js?8dbb2654b60e3cf9dbd185ac7547f5c8";
-			var s = document.getElementsByTagName("script")[0];
-			s.parentNode.insertBefore(hm, s);
-		})();
-	</script>
-
+	<!-- 已移除原项目的百度统计脚本：自托管场景下不应把访问数据上报第三方，且该内联脚本违反 MV3 CSP -->
 	<script>
 		const title = window.localStorage.getItem("webTitle");
 		try {
-			title ? (document.title = title) : (document.title = "趣标签页");
+			title ? (document.title = title) : (document.title = "Xtab");
 		} catch (error) {
-			document.title = "趣标签页";
+			document.title = "Xtab";
 		}
-		console.log(
-			"欢迎使用funtabs趣标签页！不同标签页面，相同有趣好玩！官方网址：https://funtabs.cn"
-		);
 	</script>
 
 	<head>
+		<title>Xtab</title>
 		<meta charset="utf-8" />
 		<meta
 			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"
@@ -41,14 +30,14 @@
 		/>
 		<meta
 			name="description"
-			content="funtabs趣标签页、趣导航，美化您的浏览器主页与newtab新标签页，清新、简约、不简单！高度的可自定义操作，让您设置属于您专属的独特导航页面，是一款小而美的导航网站！"
+			content="Xtab 标签页、网址导航，美化您的浏览器主页与 newtab 新标签页。数据全部保存在您自己的服务器上，支持离线使用。"
 		/>
 		<link rel="icon" href="./icons/logo.png" />
 		<link rel="apple-touch-icon" href="./icons/logo.png" />
 		<link rel="manifest" href="./manifest.json" />
 		<meta
 			name="keywords"
-			content="网址导航、方格桌面、funtabs、主页、新标签页、起始页、自定义、工具栏、小组件、美观、美化、newtab、趣标签页"
+			content="网址导航、方格桌面、Xtab、主页、新标签页、起始页、自定义、工具栏、小组件、自托管"
 		/>
 	</head>
 

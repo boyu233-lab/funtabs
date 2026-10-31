@@ -124,9 +124,9 @@ const funtabsData = {
 					id: 10,
 				},
 				{
-					label: "趣标签页官网",
+					label: "Xtab 项目",
 					type: "link",
-					link: "https://www.funtabs.cn",
+					link: "https://github.com/boyu233-lab/funtabs",
 					size: 11,
 					x: "80",
 					y: "20",
