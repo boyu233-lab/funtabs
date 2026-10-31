@@ -21,8 +21,14 @@ services:
     environment:
       - PORT=8099
       - DATA_DIR=/app/data
-      # 建议设置，前端在「设置 - 自托管」里填同样的值
+      # 公网访问必填：与网页「自托管设置」里填的一致
+      # 生成方式：openssl rand -hex 32
       - API_TOKEN=
+      # 前面挂了群晖反向代理 / nginx / Cloudflare Tunnel 时必须设为 1，
+      # 否则限流会把所有请求当成同一个 IP 而误伤
+      - TRUST_PROXY=0
+      # 单 IP 每 5 分钟请求上限，0 表示不限
+      - RATE_LIMIT=600
     volumes:
       # 所有数据都在这个目录里，备份就是把整个 data 目录打包
       - ./data:/app/data

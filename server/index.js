@@ -14,11 +14,18 @@ const DATA_FILE = path.join(DATA_DIR, "funtabs.json");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 const API_TOKEN = process.env.API_TOKEN || "";
 const MAX_BODY = process.env.MAX_BODY || "20mb";
+// 反向代理后 req.ip 会全部变成代理的地址，必须显式信任才能正确限流。
+// 群晖反向代理 / nginx / Cloudflare Tunnel 场景设为 1；直连保持 0。
+const TRUST_PROXY = process.env.TRUST_PROXY || "0";
+// 单 IP 在窗口期内的最大请求数，用于缓解公网下的暴力破解与刷接口
+const RATE_LIMIT = parseInt(process.env.RATE_LIMIT || "600", 10);
+const RATE_WINDOW = parseInt(process.env.RATE_WINDOW || "300000", 10);
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const app = express();
+app.set("trust proxy", TRUST_PROXY);
 app.use(express.json({ limit: MAX_BODY }));
 
 /** 原子写：先写临时文件再 rename，避免写一半断电导致数据损坏 */
@@ -45,12 +52,36 @@ async function readData() {
   }
 }
 
+/** 极简内存限流：无第三方依赖，定期清理过期桶避免内存无限增长 */
+const buckets = new Map();
+function rateLimit(req, res, next) {
+  if (RATE_LIMIT <= 0) return next();
+  const now = Date.now();
+  const key = req.ip || "unknown";
+  const bucket = buckets.get(key);
+  if (!bucket || now > bucket.resetAt) {
+    buckets.set(key, { count: 1, resetAt: now + RATE_WINDOW });
+    if (buckets.size > 5000) {
+      for (const [k, v] of buckets) if (now > v.resetAt) buckets.delete(k);
+    }
+    return next();
+  }
+  bucket.count += 1;
+  if (bucket.count > RATE_LIMIT) {
+    res.set("Retry-After", Math.ceil((bucket.resetAt - now) / 1000));
+    return res.status(429).json({ error: "too_many_requests" });
+  }
+  return next();
+}
+
 function auth(req, res, next) {
   if (!API_TOKEN) return next();
   const header = req.get("authorization") || "";
   if (header === `Bearer ${API_TOKEN}`) return next();
   return res.status(401).json({ error: "unauthorized" });
 }
+
+app.use("/api", rateLimit);
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "funtabs", time: Date.now() });

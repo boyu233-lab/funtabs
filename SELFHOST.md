@@ -69,7 +69,52 @@ docker compose -f docker-compose.image.yml up -d
 |---|---|
 | `PORT` | 服务端口，默认 8099 |
 | `DATA_DIR` | 数据目录，容器内默认 `/app/data` |
-| `API_TOKEN` | 可选。设置后所有写接口需要 `Authorization: Bearer <token>` |
+| `API_TOKEN` | **公网必填**。设置后所有写接口需要 `Authorization: Bearer <token>` |
+| `TRUST_PROXY` | 前置反向代理时设为 `1`，否则限流会把所有来源当同一 IP |
+| `RATE_LIMIT` | 单 IP 每 5 分钟请求上限，默认 600，`0` 关闭限流 |
+
+## 公网访问
+
+### 必须做的三件事
+
+**1）设置 API_TOKEN**
+
+```bash
+openssl rand -hex 32
+```
+
+把结果填进 compose 的 `API_TOKEN`，并在网页右下角「云图标 → 自托管设置」里填同样的值，点「测试连接」确认显示「已连接」。
+
+未设置 token 时，任何人都能读写你的书签数据。实测校验结果：
+
+| 场景 | 返回 |
+|---|---|
+| 不带 token 读 / 写 | 401 |
+| token 错误 | 401 |
+| token 正确 | 200 |
+
+**2）必须上 HTTPS**
+
+除了传输安全，还有一个硬约束：**浏览器只在安全上下文（HTTPS 或 localhost）开放 File System Access API**。
+也就是说公网 HTTP 下，Obsidian 的「直连 vault 读写 md」通道会直接失效，快速收集（Advanced URI 通道）不受影响。
+
+**3）正确设置 TRUST_PROXY**
+
+前置了群晖反向代理、nginx 或 Cloudflare Tunnel 时，服务端看到的来源 IP 全是代理地址。
+不设 `TRUST_PROXY=1`，限流会把所有访问当成同一个 IP，正常用几分钟就被 429 拦掉。
+
+### 三种外网方案
+
+| 方案 | 做法 | 适合 |
+|---|---|---|
+| **Tailscale / WireGuard**（推荐） | NAS 和手机电脑都装客户端，用内网 IP 直接访问 | 只有自己用，安全性最高，零端口暴露 |
+| **Cloudflare Tunnel** | `cloudflared` 容器 + 免费域名，自带 HTTPS | 没有公网 IP，也不想开路由器端口 |
+| **群晖反向代理** | 控制面板 → 登录门户 → 高级 → 反向代理，配好证书 | 已有域名和公网 IP |
+
+群晖反向代理要点：来源协议 HTTPS、来源端口 443、目的地 `http://localhost:8099`，
+并在「自定义标头」里确认保留了 `Authorization`（默认会透传，不要手动删掉）。
+
+> 不建议直接把 8099 端口转发到公网：裸 HTTP、无证书、容易被扫描器盯上。
 
 ## 本地开发
 

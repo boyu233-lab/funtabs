@@ -3,6 +3,7 @@ import {
 	legacyLogicalPropertiesTransformer,
 } from "@ant-design/cssinjs";
 import {
+	CloudServerOutlined,
 	DownOutlined,
 	FileMarkdownOutlined,
 	FormatPainterOutlined,
@@ -52,6 +53,7 @@ import Donate from "./donate";
 import Header from "./header";
 import LogoArea from "./logoArea";
 import ObsidianPanel from "./obsidianPanel";
+import SelfHostPanel from "./selfHostPanel";
 import SearchTools from "./searchTools";
 import Settings from "./settings";
 import ShowList from "./showList";
@@ -209,6 +211,7 @@ const Home = () => {
 		() => window.localStorage.getItem("dailyWallpaper") === "1"
 	);
 	const [obsidianOpen, setObsidianOpen] = useState(false);
+	const [selfHostOpen, setSelfHostOpen] = useState(false);
 
 	const [timeArea, setTimeArea] = useState(() => {
 		const timeAreaLocal = localStorage.getItem("timeArea");
@@ -1248,12 +1251,21 @@ const Home = () => {
 							tooltip="Obsidian"
 							onClick={() => setObsidianOpen(true)}
 						/>
+						<FloatButton
+							icon={<CloudServerOutlined />}
+							tooltip="自托管设置"
+							onClick={() => setSelfHostOpen(true)}
+						/>
 					</FloatButton.Group>
 				</div>
 			</Dropdown>
 			<ObsidianPanel
 				open={obsidianOpen}
 				onClose={() => setObsidianOpen(false)}
+			/>
+			<SelfHostPanel
+				open={selfHostOpen}
+				onClose={() => setSelfHostOpen(false)}
 			/>
 		</StyleProvider>
 	);
