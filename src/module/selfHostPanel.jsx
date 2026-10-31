@@ -76,7 +76,7 @@ export default function SelfHostPanel(props) {
 						type="warning"
 						showIcon
 						message="当前不是 HTTPS 安全上下文"
-						description="公网 HTTP 下浏览器会禁用 File System Access API，Obsidian 直连 vault 的通道将不可用。请为域名配置 HTTPS 后再使用该功能。"
+						description="公网 HTTP 下所有请求（含 API Token、书签数据）都是明文传输，存在被窃听与篡改的风险。请为域名配置 HTTPS。"
 					/>
 				)}
 
@@ -133,7 +133,7 @@ export default function SelfHostPanel(props) {
 						{secure ? (
 							<Tag color="success">HTTPS / 本机</Tag>
 						) : (
-							<Tag color="warning">HTTP（Obsidian 直连不可用）</Tag>
+							<Tag color="warning">HTTP（明文传输，不安全）</Tag>
 						)}
 					</Descriptions.Item>
 				</Descriptions>

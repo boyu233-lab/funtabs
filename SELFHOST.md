@@ -102,8 +102,8 @@ https://你的域名/selfhost      # 或 http://192.168.1.x:8099/selfhost
 
 **2）必须上 HTTPS**
 
-除了传输安全，还有一个硬约束：**浏览器只在安全上下文（HTTPS 或 localhost）开放 File System Access API**。
-也就是说公网 HTTP 下，Obsidian 的「直连 vault 读写 md」通道会直接失效，快速收集（Advanced URI 通道）不受影响。
+公网 HTTP 下所有请求（含 API Token、书签数据）都是明文传输，存在被窃听与篡改的风险。
+请务必为域名配置 HTTPS 证书。
 
 **3）正确设置 TRUST_PROXY**
 
@@ -311,7 +311,6 @@ Xtab → 顶栏「更多」→「备份恢复数据」→「上传 YAML 写入 N
 - 天气改为 Open-Meteo（免费免 key、支持 CORS、中文地名），不再依赖作者服务器
 - 壁纸改为网络图片 URL（Bing 每日图经后端代理，失败回退 Picsum），不再把 base64 塞进 localStorage
 
-### Obsidian 集成（双通道，均无需后端）
-- **A 通道**：Advanced URI，把内容一键追加到当天日记 / 指定笔记的标题下，支持剪贴板传值规避 URL 长度限制
-- **C 通道**：File System Access API，授权一次 vault 目录后直接读写 `.md` 文件（仅 Chrome / Edge）
-- 入口：页面右下角悬浮按钮
+### 移除 Obsidian 集成
+早期版本提供过 Obsidian 双通道集成（Advanced URI 唤起 + File System Access 直连 vault）。
+实测体验不佳（授权易失效、跨设备不可用、依赖浏览器专属 API），已于 v1.2.0 整体移除。

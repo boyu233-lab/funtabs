@@ -31,6 +31,17 @@ docker images --digests | grep xtab
 
 ---
 
+## [1.2.0] — 2026-10-31
+
+### 移除功能
+- **删除 Obsidian 集成**：实测体验不佳——Advanced URI 通道依赖本地 Obsidian 常驻与插件配合，File System Access 通道授权易失效、仅 Chrome/Edge 可用、换设备需重新授权。整体移除：
+  - 删除 `src/common/obsidian.js`、`src/module/obsidianPanel.jsx`
+  - 首页右下角移除 Obsidian 悬浮按钮
+  - 自托管设置面板的「安全上下文」提示改为通用的 HTTPS 安全建议（原表述是关于 File System Access API 的）
+
+### 其他
+- 新增 `tools/wetab2xtab.py`：WeTab / iTab 备份转 Xtab YAML，支持浏览器书签 HTML，支持追加模式保留现有数据
+
 ## [1.1.2] — 2026-10-31
 
 ### 安全修复（详见 SECURITY-AUDIT.md）

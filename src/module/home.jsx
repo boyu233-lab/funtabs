@@ -4,7 +4,6 @@ import {
 } from "@ant-design/cssinjs";
 import {
 	DownOutlined,
-	FileMarkdownOutlined,
 	FormatPainterOutlined,
 	PictureOutlined,
 	PlusSquareOutlined,
@@ -49,7 +48,6 @@ import Clock from "./clock";
 import { funtabsData } from "./data";
 import Header from "./header";
 import LogoArea from "./logoArea";
-import ObsidianPanel from "./obsidianPanel";
 import SearchTools from "./searchTools";
 import Settings from "./settings";
 import ShowList from "./showList";
@@ -206,7 +204,6 @@ const Home = () => {
 	const [dailyWallpaper, setDailyWallpaper] = useState(
 		() => window.localStorage.getItem("dailyWallpaper") === "1"
 	);
-	const [obsidianOpen, setObsidianOpen] = useState(false);
 
 	const [timeArea, setTimeArea] = useState(() => {
 		const timeAreaLocal = localStorage.getItem("timeArea");
@@ -1226,20 +1223,11 @@ const Home = () => {
 							tooltip={dailyWallpaper ? "关闭每日壁纸" : "开启每日壁纸"}
 							onClick={toggleDailyWallpaper}
 						/>
-						<FloatButton
-							icon={<FileMarkdownOutlined />}
-							tooltip="Obsidian"
-							onClick={() => setObsidianOpen(true)}
-						/>
 						{/* 自托管设置入口已从主页移除：避免在日常页面上暴露 NAS 地址与 Token，
 						    改为访问独立页面 /selfhost 进行配置 */}
 					</FloatButton.Group>
 				</div>
 			</Dropdown>
-			<ObsidianPanel
-				open={obsidianOpen}
-				onClose={() => setObsidianOpen(false)}
-			/>
 		</StyleProvider>
 	);
 };
