@@ -3,7 +3,7 @@
  * 数据真相源是 NAS 磁盘上的 data/funtabs.json，浏览器本地只是离线缓存。
  */
 // 发版时与 src/common/version.js、package.json 的 version 保持同步
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.0.2";
 const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");

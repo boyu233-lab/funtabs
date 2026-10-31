@@ -83,7 +83,14 @@ docker compose -f docker-compose.image.yml up -d
 openssl rand -hex 32
 ```
 
-把结果填进 compose 的 `API_TOKEN`，并在网页右下角「云图标 → 自托管设置」里填同样的值，点「测试连接」确认显示「已连接」。
+把结果填进 compose 的 `API_TOKEN`，然后在**独立设置页**里填同样的值，点「测试连接」确认显示「已连接」：
+
+```
+https://你的域名/selfhost      # 或 http://192.168.1.x:8099/selfhost
+```
+
+> 设置页已从主页移除入口（主页不再显示「自托管设置」悬浮按钮），
+> 需要改配置时直接在地址栏输入 `/selfhost` 进入，避免在日常页面上暴露 NAS 地址与 Token。
 
 未设置 token 时，任何人都能读写你的书签数据。实测校验结果：
 

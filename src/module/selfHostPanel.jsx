@@ -25,7 +25,8 @@ import {
 const { Paragraph, Text } = Typography;
 
 export default function SelfHostPanel(props) {
-	const { open, onClose } = props;
+	// standalone=true 时作为独立页面内容渲染（不使用 Modal 包裹）
+	const { open = true, onClose, standalone = false } = props;
 	const [baseUrl, setLocalBaseUrl] = useState("");
 	const [token, setLocalToken] = useState("");
 	const [testing, setTesting] = useState(false);
@@ -65,20 +66,11 @@ export default function SelfHostPanel(props) {
 		setToken(token);
 		message.success("已保存，正在重新同步");
 		retrySync();
-		onClose();
+		if (onClose) onClose();
 	}
 
-	return (
-		<Modal
-			title="自托管设置"
-			open={open}
-			onCancel={onClose}
-			onOk={handleSave}
-			okText="保存并同步"
-			cancelText="取消"
-			width={560}
-		>
-			<Space direction="vertical" size="middle" style={{ width: "100%" }}>
+	const body = (
+		<Space direction="vertical" size="middle" style={{ width: "100%" }}>
 				{!secure && (
 					<Alert
 						type="warning"
@@ -151,6 +143,21 @@ export default function SelfHostPanel(props) {
 					公网部署时请务必设置 API_TOKEN，否则任何人都能读写你的数据。
 				</Paragraph>
 			</Space>
+	);
+
+	if (standalone) return body;
+
+	return (
+		<Modal
+			title="自托管设置"
+			open={open}
+			onCancel={onClose}
+			onOk={handleSave}
+			okText="保存并同步"
+			cancelText="取消"
+			width={560}
+		>
+			{body}
 		</Modal>
 	);
 }

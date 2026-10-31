@@ -386,20 +386,8 @@ const Header = (props) => {
 					>
 						{editText}
 					</Button>
-					<Button
-						type="text"
-						style={{
-							fontWeight: "bold",
-							display: model,
-							marginRight: "-10px",
-							color: fontColor,
-						}}
-						onClick={() => {
-							window.open("https://txc.qq.com/products/501945", linkOpen);
-						}}
-					>
-						反馈
-					</Button>
+					{/* 反馈入口已移除：原按钮会跳转到作者自建的腾讯问卷（txc.qq.com），
+					    自托管版本不应再向外发送任何数据或引导 */}
 					<Dropdown
 						menu={{
 							items: moreMenu,

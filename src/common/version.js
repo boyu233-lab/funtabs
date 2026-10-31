@@ -11,7 +11,7 @@
 export const APP_NAME = "Xtab";
 
 /** 语义化版本号：主版本.次版本.修订号 */
-export const APP_VERSION = "1.0.1";
+export const APP_VERSION = "1.0.2";
 
 /** 构建日期，用于区分同一版本号的多次打包（YYYY-MM-DD） */
 export const APP_BUILD_DATE = "2026-10-31";

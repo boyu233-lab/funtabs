@@ -31,6 +31,21 @@ docker images --digests | grep xtab
 
 ---
 
+## [1.0.2] — 2026-10-31
+
+### 移除
+- **反馈功能**：顶栏「反馈」按钮跳转到作者自建的腾讯问卷（`txc.qq.com/products/501945`），自托管版本不再保留任何外链反馈入口，已整体删除
+
+### 变更
+- **自托管设置改为独立页面**：主页右下角不再显示「自托管设置」悬浮按钮，
+  避免在日常浏览页面上暴露 NAS 地址与 API Token
+  - 新增独立页面 `/selfhost`（别名 `/settings`），在地址栏输入即可进入
+  - 新增 `src/module/selfHostPage.jsx`；`SelfHostPanel` 增加 `standalone` 模式（脱离 Modal 直接渲染）
+  - 路由守卫白名单支持 `/selfhost`、`/settings`，其余未知路径仍重定向到首页
+  - 服务端 SPA 回退已支持直接刷新该路径
+
+---
+
 ## [1.0.1] — 2026-10-31
 
 ### 修复
