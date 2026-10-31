@@ -59,18 +59,17 @@ export default function mergeArr(arr1, arr2) {
           newContent.push(subItem);
         } else {
           let isSameLink = false;
-          for (let i = 0; i < newContent.length; i++) {
+          for (const contentItem of newContent) {
             if (
-              newContent[i].type === "link" &&
-              newContent[i].link === subItem.link &&
-              newContent[i].type === subItem.type
+              contentItem.type === "link" &&
+              contentItem.link.replace(/\/$/, "") === subItem.link.replace(/\/$/, "")
             ) {
               isSameLink = true;
               removedNum += 1;
-              newContent.splice(i, 1);
               break;
             }
           }
+          // 重复时保留先出现的一份，不再删除已入列的条目，避免两份数据一起丢失
           if (!isSameLink) {
             newContent.push(subItem);
           }

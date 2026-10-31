@@ -87,21 +87,47 @@ const request = async (url, config, token) => {
 	}
 };
 
-const debounce = (func, delay) => {
+export const debounce = (func, delay) => {
 	let timer = null;
+	let waiters = [];
 	return (...args) => {
-		clearTimeout(timer);
+		// 被覆盖的调用必须给一个结果，否则 Promise 永远悬挂、调用方静默等待
+		if (timer) {
+			clearTimeout(timer);
+			const dropped = waiters;
+			waiters = [];
+			dropped.forEach((w) => w.resolve({ debounced: true, sent: false }));
+		}
 		return new Promise((resolve, reject) => {
+			waiters.push({ resolve, reject });
 			timer = setTimeout(async () => {
+				const settled = waiters;
+				waiters = [];
+				timer = null;
 				try {
 					const result = await func(...args);
-					resolve(result);
+					settled.forEach((w) => w.resolve(result));
 				} catch (error) {
-					reject(error);
+					settled.forEach((w) => w.reject(error));
 				}
 			}, delay);
 		});
 	};
+};
+
+/** 写请求专用：按 url 合并同内容的并发提交，避免重复写入 */
+const inflightWrites = new Map();
+export const postOnce = (url, data, token) => {
+	const key = `${url}|${
+		data instanceof FormData ? "formdata" : JSON.stringify(data)
+	}`;
+	const running = inflightWrites.get(key);
+	if (running) return running;
+	const p = post(url, data, token).finally(() => {
+		inflightWrites.delete(key);
+	});
+	inflightWrites.set(key, p);
+	return p;
 };
 
 //GET请求函数
@@ -132,8 +158,8 @@ export const get = (url, params, token) => {
 	});
 };
 
-//POST请求函数
-export const post = debounce((url, data, token) => {
+//POST请求函数（写操作不再去抖：丢数据比多发一次请求严重得多）
+export const post = (url, data, token) => {
 	if (data instanceof FormData) {
 		// 如果是FormData类型，则不需要手动设置content-type
 		return new Promise((resolve, reject) => {
@@ -170,4 +196,4 @@ export const post = debounce((url, data, token) => {
 				});
 		});
 	}
-}, 300);
+};

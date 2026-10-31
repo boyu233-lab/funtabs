@@ -25,3 +25,6 @@ yarn-error.log*
 # Local Netlify folder
 .netlify
 functions
+
+# 自托管数据（NAS 上的真实数据，不入库）
+/data

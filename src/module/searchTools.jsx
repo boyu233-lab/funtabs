@@ -262,14 +262,21 @@ const SearchTools = (props) => {
 
 	// 处理点击搜索建议项的操作
 	const clickSuggestion = ({ key }) => {
-		// 从 `key` 参数中获取索引
-		const num = parseInt(key.slice(-1));
-		// 使用该索引在 `searchSuggestion` 数组中查找对应的搜索建议，并将其设置为当前的搜索内容
-		const { label } = searchSuggestion[num];
+		// 原来用 key.slice(-1) 只取最后一位，索引 >= 10 时会错位
+		const matched = /(\d+)$/.exec(String(key));
+		const num = matched ? parseInt(matched[1], 10) : NaN;
+		// 越界或数据缺失时不能解构 undefined，否则点击直接抛 TypeError
+		const suggestion = searchSuggestion[num];
+		const label = suggestion ? suggestion.label : String(key);
 		setSearchContent(label);
 		// 找到当前选中的搜索引擎链接，使用编码过的搜索内容作为查询参数附加到链接中，以新页面打开链接
-		const { link } = searchEngineList.find((item) => item.key === searchEngine);
-		window.open(`${link}${encodeURIComponent(label)}`, linkOpen);
+		const engine =
+			searchEngineList.find((item) => item.key === searchEngine) ||
+			searchEngineList[0];
+		if (!engine || !engine.link) {
+			return;
+		}
+		window.open(`${engine.link}${encodeURIComponent(label)}`, linkOpen);
 		// 将搜索内容添加到搜索历史记录中
 		history(label);
 	};
@@ -355,6 +362,7 @@ const SearchTools = (props) => {
 	}
 
 	useEffect(() => {
+		const __syncCtrl = new AbortController();
 		window.addEventListener("setItemEvent", function (e) {
 			switch (e.key) {
 				case "searchEngine":
@@ -366,8 +374,8 @@ const SearchTools = (props) => {
 				default:
 					break;
 			}
-		});
-		return window.removeEventListener("setItemEvent", function () {});
+		}, { signal: __syncCtrl.signal });
+		return () => __syncCtrl.abort();
 		// eslint-disable-next-line
 	}, []);
 

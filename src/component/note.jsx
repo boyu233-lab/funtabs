@@ -39,8 +39,9 @@ const Note = (props) => {
 	}
 
 	useEffect(() => {
-		window.addEventListener("setItemEvent", (e) => changeLocal(e));
-		return window.removeEventListener("setItemEvent", (e) => changeLocal(e));
+		const __syncCtrl = new AbortController();
+		window.addEventListener("setItemEvent", (e) => changeLocal(e), { signal: __syncCtrl.signal });
+		return () => __syncCtrl.abort();
 		// eslint-disable-next-line
 	}, []);
 

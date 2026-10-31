@@ -146,6 +146,7 @@ export default function ChangeWallpaper(props) {
 	}, [url]);
 
 	useEffect(() => {
+		const __syncCtrl = new AbortController();
 		window.addEventListener("setItemEvent", function (e) {
 			switch (e.key) {
 				case "boxShadowOpen": {
@@ -199,8 +200,8 @@ export default function ChangeWallpaper(props) {
 				default:
 					break;
 			}
-		});
-		return window.removeEventListener("setItemEvent", function (e) {});
+		}, { signal: __syncCtrl.signal });
+		return () => __syncCtrl.abort();
 		// eslint-disable-next-line
 	}, []);
 

@@ -1,10 +1,9 @@
 import { PushpinFilled, SettingTwoTone } from "@ant-design/icons";
-import { Cascader, Popover, Skeleton, Space, message } from "antd";
+import { AutoComplete, Popover, Skeleton, Space, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import useDoubleClick from "use-double-click";
+import { searchCity, subscribeWeather } from "../common/weatherService";
 import cursorControl from "../common/cursorControl";
-import { getClear } from "../common/fetchClear";
-import variable from "../common/variable";
 import "../module/clock.css";
 import DeleteCard from "../module/deleteCard";
 import ShowLabel from "../module/showLabel";
@@ -30,7 +29,6 @@ const LocalWeather = (props) => {
 		setTabsActiveKey,
 	} = props;
 	const localCity = localStorage.getItem(`weather_${item.id}`);
-	const localData = localStorage.getItem(`data_weather_${item.id}`);
 	const [load, setLoad] = useState(true);
 	const [weatherData, setWeatherData] = useState({
 		city: "",
@@ -41,47 +39,52 @@ const LocalWeather = (props) => {
 		qualityLevel: "",
 		windLevel: "",
 		wind: "",
+		icon: "",
+		stale: false,
 	});
+	// 城市改为纯名称字符串，不再依赖作者服务返回的省/市级联数组
 	const [cityName, setCityName] = useState(() => {
-		if (localCity) {
-			return JSON.parse(localCity);
+		if (!localCity) return "";
+		try {
+			const parsed = JSON.parse(localCity);
+			return typeof parsed === "string" ? parsed : "";
+		} catch (error) {
+			return localCity || "";
 		}
 	});
-	const timmer = useRef();
 
+	// 共享订阅：所有天气卡片共用一份数据与同一个轮询定时器，不再各自 setInterval
 	useEffect(() => {
-		if (localData) {
+		const unsubscribe = subscribeWeather(cityName, (result) => {
+			if (!result || !result.data) {
+				return;
+			}
+			const data = result.data;
 			setLoad(false);
-			const data = JSON.parse(localData);
 			setWeatherData({
-				city: data.city || "",
-				temp: data.current_temperature || "",
-				weather: data.current_condition || "",
-				aqi: data.aqi || "",
-				qualityLevel: data.quality_level || "",
-				wind: data.wind_direction || "",
-				weatherType: data.weather_icon_id || "",
-				windLevel: data.wind_level || "",
+				city: data.city || cityName || "",
+				temp: data.temp,
+				weather: data.weather,
+				aqi: "",
+				qualityLevel: "",
+				wind: data.wind,
+				weatherType: data.weatherType,
+				windLevel: data.windLevel,
+				icon: data.icon,
+				stale: !!result.stale,
 			});
-		}
-	}, [localData]);
-
-	useEffect(() => {
-		fetchWeatherData(cityName ? cityName[1] : "");
-		timmer.current = setInterval(() => {
-			fetchWeatherData(cityName ? cityName[1] : "");
-		}, 120000);
-		return () => clearInterval(timmer.current);
-		// eslint-disable-next-line
+		});
+		return () => unsubscribe();
 	}, [cityName]);
 
 	function changeLocal(e) {
 		switch (e.key) {
 			case `weather_${item.id}`: {
 				try {
-					setCityName(JSON.parse(e.newValue));
+					const parsed = JSON.parse(e.newValue);
+					setCityName(typeof parsed === "string" ? parsed : "");
 				} catch (error) {
-					setCityName(e.newValue);
+					setCityName(e.newValue || "");
 				}
 				break;
 			}
@@ -91,68 +94,38 @@ const LocalWeather = (props) => {
 	}
 
 	useEffect(() => {
-		window.addEventListener("setItemEvent", (e) => changeLocal(e));
-		return () =>
-			window.removeEventListener("setItemEvent", (e) => changeLocal(e));
+		const __syncCtrl = new AbortController();
+		window.addEventListener("setItemEvent", (e) => changeLocal(e), { signal: __syncCtrl.signal });
+		return () => __syncCtrl.abort();
 		// eslint-disable-next-line
 	}, []);
 
-	const fetchWeatherData = (city) => {
-		const params = { city: city || "" };
-		getClear(`${variable.weather}`, params).then((data) => {
-			localStorage.setItem(`data_weather_${item.id}`, JSON.stringify(data));
-			setLoad(false);
-			setWeatherData({
-				city: data.city || "",
-				temp: data.current_temperature || "",
-				weather: data.current_condition || "",
-				aqi: data.aqi || "",
-				qualityLevel: data.quality_level || "",
-				wind: data.wind_direction || "",
-				weatherType: data.weather_icon_id || "",
-				windLevel: data.wind_level || "",
-			});
-		});
+	const [options, setOptions] = useState([]);
+
+	// 按关键字搜索城市，走 Open-Meteo，不再依赖作者服务器下发的城市列表
+	const onSearchCity = async (keyword) => {
+		const list = await searchCity(keyword);
+		setOptions(list);
 	};
 
 	const onChange = (value) => {
+		setCityName(value || "");
+		localStorage.setItem(`weather_${item.id}`, JSON.stringify(value || ""));
 		if (value) {
-			message.success("城市选择成功");
-			setCityName(value);
-			localStorage.setItem(`weather_${item.id}`, JSON.stringify(value));
-		} else {
-			message.success("已设置为自动获取天气");
-			setCityName("");
-			localStorage.setItem(`weather_${item.id}`, "");
+			message.success("城市设置成功");
 		}
 	};
 
-	const filter = (inputValue, path) =>
-		path.some(
-			(option) =>
-				option.label.toLowerCase().indexOf(inputValue.toLowerCase()) > -1
-		);
-
-	const [options, setOptions] = useState([]);
-
-	useEffect(() => {
-		try {
-			getClear(`${variable.cityList}`).then((res) => {
-				setOptions(res);
-			});
-		} catch (error) {}
-	}, []);
-
 	function weatherSettings() {
 		return (
-			<Cascader
+			<AutoComplete
 				value={cityName}
 				options={options}
+				onSearch={onSearchCity}
 				onChange={onChange}
-				placeholder="自定义城市"
-				showSearch={{
-					filter,
-				}}
+				placeholder="输入城市名，如 北京"
+				allowClear
+				style={{ width: 200 }}
 			/>
 		);
 	}
@@ -190,20 +163,23 @@ const LocalWeather = (props) => {
 		qualityLevel,
 		wind,
 		windLevel,
+		icon,
+		stale,
 	} = weatherData;
 
-	const showBackground = () =>
-		cardStyle !== "onlyText"
-			? weatherType === "0" || weatherType === "1"
-				? "-webkit-linear-gradient(top, rgb(13, 104, 188), rgb(114, 173, 224))"
-				: weatherType === "30"
-				? "linear-gradient(rgb(24, 50, 89), rgb(52, 130, 186))"
-				: "-webkit-linear-gradient(top, rgb(72, 86, 99), rgb(161, 184, 202))"
-			: "none";
+	// 背景按 WMO 天气代码判断：0/1 晴，45/48 雾，其余按多云/阴处理
+	const showBackground = () => {
+		if (cardStyle === "onlyText") return "none";
+		const code = Number(weatherType);
+		if (code === 0 || code === 1) {
+			return "-webkit-linear-gradient(top, rgb(13, 104, 188), rgb(114, 173, 224))";
+		}
+		if (code === 45 || code === 48) {
+			return "linear-gradient(rgb(24, 50, 89), rgb(52, 130, 186))";
+		}
+		return "-webkit-linear-gradient(top, rgb(72, 86, 99), rgb(161, 184, 202))";
+	};
 
-	const showWeatherIcon = () =>
-		!load &&
-		`https://h5tq.moji.com/tianqi/assets/images/weather/w${weatherType}.png`;
 
 	const [fontSize, setFontSize] = useState(0);
 
@@ -263,18 +239,24 @@ const LocalWeather = (props) => {
 					<Space>
 						<PushpinFilled />
 						<span>{city}</span>
+						{stale ? (
+							<span style={{ opacity: 0.75, fontSize: "12px" }}>
+								离线缓存
+							</span>
+						) : null}
 					</Space>
-					<img
-						src={showWeatherIcon()}
-						alt=""
+					{/* 用 emoji 图标代替墨迹天气的远程图片，离线也能显示 */}
+					<span
 						style={{
 							position: "absolute",
 							top: "10px",
 							right: "12px",
-							width: "auto",
-							height: "33px",
+							fontSize: "28px",
+							lineHeight: "33px",
 						}}
-					/>
+					>
+						{load ? "" : icon || "🌡️"}
+					</span>
 					<p
 						className="font-style"
 						style={{

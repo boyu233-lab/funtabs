@@ -63,6 +63,7 @@ const Header = (props) => {
 	const { width } = useWindowSize();
 
 	useEffect(() => {
+		const __syncCtrl = new AbortController();
 		window.addEventListener("setItemEvent", function (e) {
 			switch (e.key) {
 				case "webTitle":
@@ -72,10 +73,8 @@ const Header = (props) => {
 				default:
 					break;
 			}
-		});
-		return () => {
-			window.removeEventListener("setItemEvent", function () {});
-		};
+		}, { signal: __syncCtrl.signal });
+		return () => __syncCtrl.abort();
 		// eslint-disable-next-line
 	}, []);
 

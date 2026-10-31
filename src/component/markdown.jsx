@@ -1,6 +1,6 @@
 import { Modal, message } from "antd";
 import MarkdownIt from "markdown-it";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import MdEditor from "react-markdown-editor-lite";
 // import style manually
 import { CloseCircleFilled } from "@ant-design/icons";
@@ -30,6 +30,62 @@ export default function Markdown(props) {
 		setTabsActiveKey,
 	} = props;
 	const mdParser = new MarkdownIt(/* Markdown-it options */);
+	// 受控内容：此前 MdEditor 未接 value/onChange，编辑结果根本不会保存
+	const [mdValue, setMdValue] = useState(item && item.content ? item.content : "");
+	const writeTimer = useRef(null);
+
+	/** 把 markdown 内容防抖写回当前分类的卡片里 */
+	function persistMd(text) {
+		if (typeof setLinkList !== "function" || !item) return;
+		clearTimeout(writeTimer.current);
+		writeTimer.current = setTimeout(() => {
+			setLinkList((prev) =>
+				(prev || []).map((tab) => {
+					if (!tab || !Array.isArray(tab.content)) return tab;
+					if (tab.key !== tabsActiveKey) return tab;
+					return {
+						...tab,
+						content: tab.content.map((card) =>
+							card && card.id === item.id ? { ...card, content: text } : card
+						),
+					};
+				})
+			);
+		}, 400);
+	}
+
+	function handleEditorChange({ text }) {
+		setMdValue(text);
+		persistMd(text);
+	}
+
+	// 关闭弹窗时立刻落盘，避免防抖窗口内丢失最后几个字
+	useEffect(
+		() => () => {
+			if (writeTimer.current) {
+				clearTimeout(writeTimer.current);
+				writeTimer.current = null;
+				if (typeof setLinkList === "function" && item) {
+					setLinkList((prev) =>
+						(prev || []).map((tab) => {
+							if (!tab || !Array.isArray(tab.content)) return tab;
+							if (tab.key !== tabsActiveKey) return tab;
+							return {
+								...tab,
+								content: tab.content.map((card) =>
+									card && card.id === item.id
+										? { ...card, content: mdValue }
+										: card
+								),
+							};
+						})
+					);
+				}
+			}
+		},
+		// eslint-disable-next-line
+		[]
+	);
 
 	function handleImage(file) {
 		return new Promise((resolve) => {
@@ -203,6 +259,8 @@ export default function Markdown(props) {
 					}
 				>
 					<MdEditor
+						value={mdValue}
+						onChange={handleEditorChange}
 						style={{ height: "calc(100dvh - 100px)", maxHeight: "800px" }}
 						renderHTML={(text) => mdParser.render(text)}
 						onImageUpload={handleImage}

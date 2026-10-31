@@ -1,0 +1,16 @@
+services:
+  funtabs:
+    build: .
+    image: funtabs:latest
+    container_name: funtabs
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      - PORT=8099
+      - DATA_DIR=/app/data
+      # 建议设置，前端在「设置 - 自托管」里填同样的值
+      - API_TOKEN=
+    volumes:
+      # 所有数据都在这个目录里，备份就是把整个 data 目录打包
+      - ./data:/app/data

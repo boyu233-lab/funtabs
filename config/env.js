@@ -32,7 +32,11 @@ const dotenvFiles = [
 // https://github.com/motdotla/dotenv-expand
 dotenvFiles.forEach(dotenvFile => {
   if (fs.existsSync(dotenvFile)) {
-    require('dotenv-expand')(
+    // dotenv-expand v9+ 改为具名导出，这里两种形态都兼容
+    const dotenvExpand = require('dotenv-expand');
+    const expand =
+      typeof dotenvExpand === 'function' ? dotenvExpand : dotenvExpand.expand;
+    expand(
       require('dotenv').config({
         path: dotenvFile,
       })
