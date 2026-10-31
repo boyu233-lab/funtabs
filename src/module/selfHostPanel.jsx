@@ -13,6 +13,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { ping } from "../common/nasStore";
+import { VERSION_LABEL, VERSION_TITLE } from "../common/version";
 import {
 	getBaseUrl,
 	getToken,
@@ -128,6 +129,11 @@ export default function SelfHostPanel(props) {
 				<Divider style={{ margin: "8px 0" }} />
 
 				<Descriptions column={1} size="small" bordered>
+					<Descriptions.Item label="版本">
+						<Text code title={VERSION_TITLE}>
+							{VERSION_LABEL}
+						</Text>
+					</Descriptions.Item>
 					<Descriptions.Item label="数据位置">
 						<Text code>{baseUrl || window.location.origin}</Text>
 					</Descriptions.Item>

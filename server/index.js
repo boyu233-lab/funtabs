@@ -1,7 +1,9 @@
 /**
- * funtabs 自托管后端
+ * Xtab 自托管后端
  * 数据真相源是 NAS 磁盘上的 data/funtabs.json，浏览器本地只是离线缓存。
  */
+// 发版时与 src/common/version.js、package.json 的 version 保持同步
+const APP_VERSION = "1.0.1";
 const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");
@@ -84,7 +86,12 @@ function auth(req, res, next) {
 app.use("/api", rateLimit);
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, service: "xtab", time: Date.now() });
+  res.json({
+    ok: true,
+    service: "xtab",
+    version: APP_VERSION,
+    time: Date.now(),
+  });
 });
 
 app.get("/api/data", auth, async (req, res) => {
@@ -419,11 +426,27 @@ app.get("/api/fanyi", auth, async (req, res) => {
 
 const buildDir = path.join(__dirname, "..", "build");
 if (fs.existsSync(buildDir)) {
-  app.use(express.static(buildDir, { maxAge: "1h" }));
+  // 缓存策略：带内容哈希的静态资源（/static/**）可长期缓存；
+  // index.html 必须每次回源校验（no-cache），否则更新镜像后浏览器
+  // 仍会加载旧入口，引用旧 JS，出现"已部署新版但页面没变"的问题。
+  app.use(
+    express.static(buildDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        } else if (/[.-][0-9a-zA-Z_-]{8,}\.(js|css|png|jpe?g|svg|woff2?)$/.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=3600");
+        }
+      },
+    })
+  );
   // SPA 回退：不用 app.get("*")，Express 5 起该写法非法（需 /*splat），
   // 用中间件形式可同时兼容 v4 / v5
   app.use((req, res, next) => {
     if (req.method !== "GET") return next();
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(buildDir, "index.html"));
   });
 } else {

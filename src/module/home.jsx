@@ -41,6 +41,7 @@ import {
 	SYNC_EVENT,
 } from "../common/nasStore";
 import { getCachedWallpaper, getDailyWallpaper } from "../common/wallpaperService";
+import { VERSION_LABEL, VERSION_TITLE } from "../common/version";
 import { setDeviceType } from "../redux/slice/deviceType";
 import AddNewCard from "./addNewCard";
 import Bookmarks from "./bookmarks";
@@ -1202,6 +1203,25 @@ const Home = () => {
 							: "数据冲突 · 本地与 NAS 不一致"}
 					</div>
 				) : null}
+				{/* 版本角标：用于确认当前访问的是哪个构建版本 */}
+				<div
+					title={VERSION_TITLE}
+					style={{
+						position: "fixed",
+						right: 76,
+						bottom: 10,
+						zIndex: 30,
+						fontSize: 11,
+						letterSpacing: 0.3,
+						color: "#fff",
+						opacity: 0.45,
+						pointerEvents: "auto",
+						userSelect: "none",
+						textShadow: "0 1px 2px rgb(0 0 0 / 60%)",
+					}}
+				>
+					{VERSION_LABEL}
+				</div>
 				<FloatButton.Group shape="circle" style={{ right: 24 }}>
 						<FloatButton.BackTop duration={0} />
 						<FloatButton
