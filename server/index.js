@@ -4,7 +4,7 @@
  * 浏览器本地只是离线缓存。
  */
 // 发版时与 src/common/version.js、package.json 的 version 保持同步
-const APP_VERSION = "1.1.1";
+const APP_VERSION = "1.1.2";
 const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");
@@ -29,6 +29,15 @@ const TRUST_PROXY = process.env.TRUST_PROXY || "0";
 // 单 IP 在窗口期内的最大请求数，用于缓解公网下的暴力破解与刷接口
 const RATE_LIMIT = parseInt(process.env.RATE_LIMIT || "600", 10);
 const RATE_WINDOW = parseInt(process.env.RATE_WINDOW || "300000", 10);
+// SSRF 防护开关：后端有两个"按 URL 抓取网页"的接口（/api/webtitle、/api/favicon），
+// 若不对目标地址做限制，任何拿到 API_TOKEN 的人都能借你的 NAS 去探测内网
+// （群晖 DSM、路由器、云元数据 169.254.169.254 等）并回读内容。
+// 默认禁止访问内网/本机地址；若你的书签里有 192.168.x.x 这类内网服务、
+// 需要抓取标题和图标，设置 ALLOW_PRIVATE_NET=1 显式放行。
+const ALLOW_PRIVATE_NET = process.env.ALLOW_PRIVATE_NET === "1";
+// 是否使用 Google 的 favicon 服务兜底。开启可向几乎所有站点取到图标，
+// 代价是把你的书签域名提交给 Google；设为 0 关闭。
+const FAVICON_GOOGLE_FALLBACK = process.env.FAVICON_GOOGLE_FALLBACK !== "0";
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -194,7 +203,10 @@ function rateLimit(req, res, next) {
 function auth(req, res, next) {
   if (!API_TOKEN) return next();
   const header = req.get("authorization") || "";
-  if (header === `Bearer ${API_TOKEN}`) return next();
+  // 定长比较，避免通过响应耗时逐字节猜测 token
+  const a = Buffer.from(header);
+  const b = Buffer.from(`Bearer ${API_TOKEN}`);
+  if (a.length === b.length && crypto.timingSafeEqual(a, b)) return next();
   return res.status(401).json({ error: "unauthorized" });
 }
 
@@ -390,9 +402,30 @@ app.post("/api/upload", auth, async (req, res) => {
   }
 });
 
+/**
+ * 静态资源安全响应头。
+ * 关键：SVG 是 XML，可以内嵌 <script>。同源提供的 .svg 被直接打开时会执行脚本，
+ * 形成存储型 XSS（可窃取 localStorage 里的 nasToken 并读写全部书签）。
+ * 因此对 SVG 强制附带 CSP（禁止一切加载与脚本）与 nosniff。
+ */
+function safeStaticHeaders(res, filePath) {
+  const isSvg = /\.svg$/i.test(filePath);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  if (isSvg) {
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox"
+    );
+  }
+}
+
 app.use(
   "/uploads",
-  express.static(UPLOAD_DIR, { maxAge: "30d", immutable: true })
+  express.static(UPLOAD_DIR, {
+    maxAge: "30d",
+    immutable: true,
+    setHeaders: safeStaticHeaders,
+  })
 );
 
 /* ================= Xtab 自托管版新增代理接口 =================
@@ -400,6 +433,82 @@ app.use(
 
 const FAVICON_DIR = path.join(DATA_DIR, "favicons");
 fs.mkdirSync(FAVICON_DIR, { recursive: true });
+
+/* ==================== SSRF 防护 ====================
+ * /api/webtitle 与 /api/favicon 会按用户传入的 URL 发起请求。
+ * 必须拦截内网、本机、链路本地与云元数据地址，否则本服务会变成
+ * 攻击者探测内网的跳板（可回显内网页面标题）。
+ */
+function isPrivateIPv4(ip) {
+  const p = ip.split(".").map(Number);
+  if (p.length !== 4 || p.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
+    return true; // 解析不出合法 IPv4 一律拒绝
+  }
+  if (p[0] === 10 || p[0] === 127 || p[0] === 0) return true;
+  if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true;
+  if (p[0] === 192 && p[1] === 168) return true;
+  if (p[0] === 169 && p[1] === 254) return true; // link-local / 云元数据
+  if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return true; // CGNAT
+  if (p[0] === 192 && p[1] === 0 && p[2] === 0) return true;
+  if (p[0] === 198 && (p[1] === 18 || p[1] === 19)) return true;
+  if (p[0] >= 224) return true; // 组播与保留
+  return false;
+}
+
+function isPrivateIPv6(ip) {
+  const v = String(ip).toLowerCase().split("%")[0];
+  if (v === "::" || v === "::1") return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(v)) return true; // fc00::/7 唯一本地地址
+  if (/^fe[89ab][0-9a-f]:/.test(v)) return true; // fe80::/10 链路本地
+  if (/^::ffff:/.test(v)) return isPrivateIPv4(v.slice(7)); // IPv4 映射地址
+  return false;
+}
+
+const dns = require("dns").promises;
+
+/** 解析主机名得到全部 IP，任一为内网地址则判定为内网 */
+async function resolvesToPrivate(hostname) {
+  // 直接就是 IP 字面量的情况
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return isPrivateIPv4(hostname);
+  if (hostname.includes(":")) return isPrivateIPv6(hostname);
+  let records = [];
+  try {
+    records = await dns.lookup(hostname, { all: true });
+  } catch (e) {
+    return true; // 解析失败按不安全处理
+  }
+  if (!records.length) return true;
+  return records.some((r) =>
+    r.family === 4 ? isPrivateIPv4(r.address) : isPrivateIPv6(r.address)
+  );
+}
+
+/**
+ * 校验外部抓取目标是否允许。
+ * 返回 { ok: true } 或 { ok: false, reason }
+ */
+async function assertSafeTarget(rawUrl) {
+  let u;
+  try {
+    u = new URL(String(rawUrl || ""));
+  } catch (e) {
+    return { ok: false, reason: "invalid_url" };
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") {
+    return { ok: false, reason: "invalid_protocol" };
+  }
+  if (ALLOW_PRIVATE_NET) return { ok: true, url: u };
+  const host = u.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    return { ok: false, reason: "private_address" };
+  }
+  if (host.endsWith(".local") || host.endsWith(".internal")) {
+    return { ok: false, reason: "private_address" };
+  }
+  const priv = await resolvesToPrivate(host);
+  if (priv) return { ok: false, reason: "private_address" };
+  return { ok: true, url: u };
+}
 
 /** 带超时的 fetch（Node 18+ 全局 fetch） */
 async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
@@ -439,6 +548,11 @@ app.get("/api/webtitle", auth, async (req, res) => {
   if (!/^https?:\/\//i.test(target)) {
     return res.status(400).json({ error: "invalid_url" });
   }
+  // SSRF 防护：拒绝内网/本机/云元数据地址（可用 ALLOW_PRIVATE_NET=1 放行）
+  const safe = await assertSafeTarget(target);
+  if (!safe.ok) {
+    return res.status(403).json({ error: safe.reason });
+  }
   try {
     const resp = await fetchWithTimeout(target, {}, 8000);
     // 只读前 256KB，足够拿到 <head> 里的 title
@@ -473,11 +587,20 @@ app.get("/api/favicon", auth, async (req, res) => {
   } catch {
     return res.status(400).json({ error: "invalid_url" });
   }
+  // SSRF 防护：目标域名本身也要过白名单检查
+  const safeOrigin = await assertSafeTarget(target);
+  if (!safeOrigin.ok) {
+    return res.status(403).json({ error: safeOrigin.reason });
+  }
   const hash = crypto.createHash("md5").update(host).digest("hex").slice(0, 12);
 
   // 已有缓存直接返回
   const cached = fs.readdirSync(FAVICON_DIR).find((f) => f.startsWith(hash));
-  if (cached) return res.json({ icon: `/favicons/${cached}` });
+  if (cached) {
+    // redirect=1：直接返回图片，便于前端把本接口当作 <img src> 使用
+    if (req.query.redirect === "1") return res.redirect(`/favicons/${cached}`);
+    return res.json({ icon: `/favicons/${cached}` });
+  }
 
   const candidates = [];
   // 1) 解析页面 HTML 中的 <link rel="...icon...">
@@ -505,14 +628,19 @@ app.get("/api/favicon", auth, async (req, res) => {
       }
     }
   } catch {}
-  // 2) 约定位置 3) Google 服务兜底
+  // 2) 约定位置 3) Google 服务兜底（会把你的书签域名发给 Google，
+  //    介意可设 FAVICON_GOOGLE_FALLBACK=0 关闭，关闭后取不到图标时返回 404）
   candidates.push(`${origin}/favicon.ico`);
-  candidates.push(
-    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
-  );
+  if (FAVICON_GOOGLE_FALLBACK) {
+    candidates.push(
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
+    );
+  }
 
   for (const iconUrl of candidates) {
     try {
+      // 每个候选地址都要过 SSRF 检查：icon 的 href 由目标页面提供，不可信
+      if (!(await assertSafeTarget(iconUrl)).ok) continue;
       const resp = await fetchWithTimeout(iconUrl, {}, 6000);
       if (!resp.ok) continue;
       const type = resp.headers.get("content-type") || "";
@@ -528,6 +656,7 @@ app.get("/api/favicon", auth, async (req, res) => {
         : "ico";
       const fileName = `${hash}.${ext}`;
       await fsp.writeFile(path.join(FAVICON_DIR, fileName), buf);
+      if (req.query.redirect === "1") return res.redirect(`/favicons/${fileName}`);
       return res.json({ icon: `/favicons/${fileName}` });
     } catch {}
   }
@@ -536,7 +665,11 @@ app.get("/api/favicon", auth, async (req, res) => {
 
 app.use(
   "/favicons",
-  express.static(FAVICON_DIR, { maxAge: "30d", immutable: true })
+  express.static(FAVICON_DIR, {
+    maxAge: "30d",
+    immutable: true,
+    setHeaders: safeStaticHeaders,
+  })
 );
 
 /** 热搜聚合代理：GET /api/hotEvent/:type → { data: [{title,url,hot}] }
@@ -651,5 +784,14 @@ migrateIfNeeded()
     app.listen(PORT, () => {
       console.log(`[xtab] 服务已启动 http://0.0.0.0:${PORT}（v${APP_VERSION}）`);
       console.log(`[xtab] 数据文件 ${DATA_FILE}（格式：${DATA_FORMAT}）`);
+      if (!API_TOKEN) {
+        console.warn(
+          "[xtab] 警告：未设置 API_TOKEN，所有接口免鉴权。若经公网访问，" +
+            "任何人都能读取并覆盖你的书签数据，请尽快在 compose 里配置 API_TOKEN。"
+        );
+      }
+      console.log(
+        `[xtab] SSRF 防护：${ALLOW_PRIVATE_NET ? "已关闭（允许抓取内网地址）" : "已开启（拒绝内网/本机地址）"}`
+      );
     });
   });

@@ -40,7 +40,7 @@ function parseChromeBookmarks(bookmarkFileContent) {
 						if (child.nodeName === "A") {
 							const label = child.innerHTML;
 							const link = child.href;
-							const icon = `https://api.iowen.cn/favicon/${child.hostname}.png`;
+							const icon = `/api/favicon?url=${encodeURIComponent(child.href)}&redirect=1`;
 							//确保新增卡片的唯一id
 							const id =
 								Date.parse(new Date()) + Math.floor(Math.random() * 1000);
@@ -72,7 +72,8 @@ function parseChromeBookmarks(bookmarkFileContent) {
 						const child = childContent[m];
 						const label = child.innerHTML;
 						const link = child.href;
-						const icon = `https://api.iowen.cn/favicon/${child.hostname}.png`; //确保新增卡片的唯一id
+						// 走自建后端代理取图标，不再把书签域名提交给第三方服务
+						const icon = `/api/favicon?url=${encodeURIComponent(child.href)}&redirect=1`; //确保新增卡片的唯一id
 						const id =
 							Date.parse(new Date()) + Math.floor(Math.random() * 1000);
 						const childLink = {

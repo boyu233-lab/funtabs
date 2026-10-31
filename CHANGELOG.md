@@ -31,6 +31,23 @@ docker images --digests | grep xtab
 
 ---
 
+## [1.1.2] — 2026-10-31
+
+### 安全修复（详见 SECURITY-AUDIT.md）
+
+**高危**
+- **回显型 SSRF**：`/api/webtitle`、`/api/favicon` 会按传入 URL 抓取网页并回显结果，攻击者可借 NAS 探测内网（群晖 DSM、路由器、云元数据 `169.254.169.254`）。新增 `assertSafeTarget()`，DNS 解析后逐 IP 校验，拦截私有网段、链路本地、CGNAT、IPv6 私有地址及 `localhost`/`.local`。新增 `ALLOW_PRIVATE_NET=1` 供内网书签抓取显式放行（默认 0）。
+- **同源存储型 XSS**：SVG 可内嵌 `<script>`，上传的 `.svg` 以 `image/svg+xml` 同源提供，直接访问即执行脚本，可窃取 `localStorage` 中的 `nasToken` 进而读写全部书签。静态响应统一加 `X-Content-Type-Options: nosniff`，`.svg` 强制附加 `Content-Security-Policy: default-src 'none'; ...; sandbox`。
+
+**中危**
+- 移除 `api.iowen.cn` 第三方图标服务：导入浏览器书签时会把全部收藏域名提交给第三方，改为走自建后端 `/api/favicon?url=...&redirect=1`。
+- Google favicon 兜底可关闭：新增 `FAVICON_GOOGLE_FALLBACK=0`。
+- `auth()` 改用 `crypto.timingSafeEqual` 恒定时间比较，避免 token 逐字节爆破。
+- 未设置 `API_TOKEN` 时启动打印醒目警告。
+
+### 审计结论
+无后门、无遥测、无硬编码密钥、无 RCE、无 `eval`/`child_process`、无恶意安装钩子。详见 `SECURITY-AUDIT.md`。
+
 ## [1.1.1] — 2026-10-31
 
 ### 修复
