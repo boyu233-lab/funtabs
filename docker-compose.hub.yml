@@ -9,8 +9,8 @@ name: xtab
 
 services:
   xtab:
-    # 镜像地址，等推送完成后把 USERNAME 换成实际的 Docker Hub 用户名
-    image: docker.io/USERNAME/xtab:latest
+    # 镜像地址：https://hub.docker.com/r/boyu233/xtab
+    image: docker.io/boyu233/xtab:latest
     container_name: xtab
     restart: unless-stopped
 
