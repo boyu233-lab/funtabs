@@ -259,6 +259,35 @@ PY
 **格式切换**：环境变量 `DATA_FORMAT=yaml`（默认）或 `json`。首次启动时若目标格式文件不存在，
 会自动从另一种格式转换过来，**原文件保留不删**。每次写入都会另存一份上一版本 `funtabs.yaml.bak`。
 
+## 从 WeTab / iTab 迁移数据
+
+WeTab 导出的备份是它自己的 JSON 结构，不能直接导入。仓库提供了转换工具 `tools/wetab2xtab.py`（零第三方依赖，Python 3.6+ 直接运行）。
+
+**第一步：从 WeTab 导出**
+WeTab 界面 → 右上角头像 / 个人信息 → 导出数据，得到一个 JSON（或 `.txt`）文件。
+> 如果 WeTab 里的书签本来就是从浏览器导入的，更省事的办法是直接从 Chrome/Edge 的书签管理器导出 `bookmarks.html`——脚本同样支持，且结构更标准。
+
+**第二步：转换**
+
+```bash
+# 生成一份全新的 xtab-import.yaml
+python tools/wetab2xtab.py WeTab备份.json -o xtab-import.yaml
+
+# 或者：追加到你现有的数据文件后面，保留已有书签（推荐）
+python tools/wetab2xtab.py WeTab备份.json --append-to /volume1/docker/xtab/data/funtabs.yaml
+```
+
+脚本会自动探测备份结构（无需关心具体字段名）、按分类归组、按规范化 URL 去重，并打印解析统计。
+图标字段刻意留空，交给 Xtab 后端按域名重新抓取，避免沿用已失效的外链。
+
+**第三步：导入**
+Xtab → 顶栏「更多」→「备份恢复数据」→「上传 YAML 写入 NAS」。
+
+**注意**
+- 上传会**整体覆盖** NAS 上的现有数据，操作前先点「下载 YAML」备份一份。
+- 用 `--append-to` 时脚本只做文本追加，改完同样需要上传回去才生效。
+- 若脚本报告「没有解析出任何书签」，说明该备份结构超出自动识别范围，把导出文件发来补一条专用解析规则即可。
+
 ## 相对于上游的改动
 
 ### 数据正确性（原项目的 bug）
