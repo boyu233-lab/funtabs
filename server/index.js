@@ -4,7 +4,7 @@
  * 浏览器本地只是离线缓存。
  */
 // 发版时与 src/common/version.js、package.json 的 version 保持同步
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");

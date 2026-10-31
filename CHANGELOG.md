@@ -31,6 +31,15 @@ docker images --digests | grep xtab
 
 ---
 
+## [1.1.1] — 2026-10-31
+
+### 修复
+- 删除 `editCard.jsx` 中残留的 `saveWebInfo` 遥测函数与调用（会把书签上报到 `variable.saveWebInfo`，
+  该字段虽已删除但仍留下调用点），连带移除无用的 `postClear` 导入
+- 新增 `REVIEW.md`：代码冗余审计、完整部件清单与数据流、优缺点自评、后续待办清单
+
+---
+
 ## [1.1.0] — 2026-10-31
 
 ### 新增：YAML 主数据文件（对标 homepage 的可编辑配置）

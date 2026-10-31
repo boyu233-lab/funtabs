@@ -16,7 +16,6 @@ import Paragraph from "antd/es/typography/Paragraph";
 import _ from "lodash";
 import React, { useEffect, useState } from "react";
 import { get } from "../common/fetch";
-import { postClear } from "../common/fetchClear";
 import { hexToRgb } from "../common/hexToRgb";
 import variable from "../common/variable";
 
@@ -462,22 +461,8 @@ const EditCard = (props) => {
 		}
 		setLinkList(editList);
 		setBackgroundColor(color);
-		const token = window.localStorage.getItem("token");
-		if (token) {
-			saveWebInfo(label, link, icon, color, token);
-		}
+		// 原 saveWebInfo 遥测（把书签上报作者服务器）已彻底删除，这里不再做任何外部上报
 		setIsModalOpen(false);
-	}
-
-	async function saveWebInfo(label, link, icon, backgroundColor, token) {
-		const formData = new FormData();
-		formData.append("label", label);
-		formData.append("link", link);
-		formData.append("icon", icon);
-		formData.append("backgroundColor", backgroundColor);
-		try {
-			await postClear(variable.saveWebInfo, formData, token);
-		} catch (error) {}
 	}
 
 	function showSettingsButton() {
