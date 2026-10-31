@@ -1,6 +1,8 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { Flipper } from "react-flip-toolkit";
 import { useSelector } from "react-redux";
+import { Input } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 import Slider from "react-slick";
 import { ReactSortable } from "react-sortablejs";
 import "slick-carousel/slick/slick-theme.css";
@@ -36,6 +38,8 @@ const ShowList = memo((props) => {
 	const [a, setA] = useState(0);
 	const [folderDisabled, setFolderDisabled] = useState(true);
 	const [click] = useState(0);
+	// 书签即时搜索（Ctrl+F 风格本地过滤），仅按名称/网址过滤当前分类
+	const [q, setQ] = useState("");
 	// 只挂载当前分类与左右相邻分类，其余留占位，避免一次性渲染全部卡片
 	const [activeSlide, setActiveSlide] = useState(num);
 
@@ -69,6 +73,17 @@ const ShowList = memo((props) => {
 			if (Math.abs(index - activeSlide) > 1) {
 				return <div key={index} style={{ minHeight: "60vh" }} />;
 			}
+			// 书签即时搜索：仅浏览态（edit==="none"）启用；编辑态不过滤，
+			// 避免过滤后的数组下标与 content 真实下标错位导致删错/改错书签
+			const kw = q.trim().toLowerCase();
+			const searching = kw !== "" && edit === "none" && deviceType === "PC";
+			const displayContent = searching
+				? item.content.filter(
+						(c) =>
+							(c.label || "").toLowerCase().includes(kw) ||
+							(c.link || "").toLowerCase().includes(kw)
+				  )
+				: item.content;
 			return (
 				<div key={index}>
 					<div
@@ -82,8 +97,10 @@ const ShowList = memo((props) => {
 							group="1"
 							id={`sortable${item.key}`}
 							key={deviceType === "PC" ? "sortable" : "sortable-phone"}
-							list={item.content}
+							list={displayContent}
 							setList={(e) => {
+								// 搜索过滤中 displayContent 是子集，若写回会丢失被过滤的书签
+								if (searching) return;
 								newlinkList[index].content = e;
 								setNewLinkList([...newlinkList]);
 							}}
@@ -91,7 +108,7 @@ const ShowList = memo((props) => {
 							tag="div"
 							ghostClass="drag-background-class"
 							style={{ ...gridStyle }}
-							disabled={drag}
+							disabled={drag || searching}
 							animation={deviceType === "PC" ? 300 : 0}
 							onStart={() => setA(0)}
 							onChoose={(e) => {
@@ -110,7 +127,7 @@ const ShowList = memo((props) => {
 								}, 10);
 							}}
 						>
-							{item.content.map((item, index) => {
+							{displayContent.map((item, index) => {
 								switch (cardStyle) {
 									case "defaultCard":
 										return (
@@ -241,11 +258,43 @@ const ShowList = memo((props) => {
 			num,
 			setTabsActiveKey,
 			tabsActiveKey,
+			q,
 		]
 	);
 
 	return (
 		<>
+			{/* 书签即时搜索框（Ctrl+F 风格本地过滤，仅 PC 浏览态） */}
+			{edit === "none" && deviceType === "PC" ? (
+				<div
+					style={{
+						position: "sticky",
+						top: 0,
+						zIndex: 30,
+						display: "flex",
+						justifyContent: "center",
+						padding: "10px 0 4px",
+						pointerEvents: "all",
+					}}
+				>
+					<Input
+						allowClear
+						prefix={
+							<SearchOutlined style={{ color: "rgba(255,255,255,0.65)" }} />
+						}
+						placeholder="搜索本页书签（名称 / 网址）"
+						value={q}
+						onChange={(e) => setQ(e.target.value)}
+						variant="filled"
+						style={{
+							maxWidth: 340,
+							background: "rgba(255,255,255,0.16)",
+							borderColor: "transparent",
+							color: "#fff",
+						}}
+					/>
+				</div>
+			) : null}
 			<Flipper flipKey={showKey(a)} spring="veryGentle">
 				<Slider ref={tabs} {...settings}>
 					{newlinkList.map(creatLinkList)}

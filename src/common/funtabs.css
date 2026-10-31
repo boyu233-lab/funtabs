@@ -505,17 +505,18 @@
 
 .side-tab-item {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	align-items: center;
-	justify-content: center;
-	gap: 5px;
+	justify-content: flex-start;
+	gap: 8px;
 	padding: 9px 10px;
-	min-width: 66px;
+	min-width: 40px;
 	border-radius: 10px;
 	cursor: pointer;
 	transition: background 0.18s ease, box-shadow 0.18s ease;
 	user-select: none;
 	position: relative;
+	white-space: nowrap;
 }
 .side-tab-item:hover {
 	background: rgba(255, 255, 255, 0.14);
@@ -529,14 +530,23 @@
 .side-tab-icon {
 	font-size: 19px;
 	line-height: 1;
+	flex-shrink: 0;
 }
+/* 默认只显示图标（窄 rail），hover 侧栏或当前项时文字向右滑出，
+   对标 WeTab 的 hover 展开文字交互 */
 .side-tab-label {
-	font-size: 12px;
-	max-width: 76px;
+	font-size: 13px;
+	max-width: 0;
+	opacity: 0;
 	overflow: hidden;
-	text-overflow: ellipsis;
 	white-space: nowrap;
-	text-align: center;
+	transition: max-width 0.2s ease, opacity 0.18s ease, margin 0.2s ease;
+}
+.side-tabs:hover .side-tab-label,
+.side-tab-item.active .side-tab-label {
+	max-width: 120px;
+	opacity: 1;
+	margin-left: 2px;
 }
 
 /* 左侧导航时给卡片网格区让位（JS 加此类） */

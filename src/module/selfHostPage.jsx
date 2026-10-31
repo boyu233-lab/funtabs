@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { VERSION_LABEL, VERSION_TITLE } from "../common/version";
 import SelfHostPanel from "./selfHostPanel";
 
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph, Text } = Typography;
 
 /**
  * 独立设置页面：/selfhost
