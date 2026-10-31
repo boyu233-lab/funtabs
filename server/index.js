@@ -4,7 +4,7 @@
  * 浏览器本地只是离线缓存。
  */
 // 发版时与 src/common/version.js、package.json 的 version 保持同步
-const APP_VERSION = "1.3.2";
+const APP_VERSION = "1.3.3";
 const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");
@@ -38,6 +38,9 @@ const ALLOW_PRIVATE_NET = process.env.ALLOW_PRIVATE_NET === "1";
 // 是否使用 Google 的 favicon 服务兜底。开启可向几乎所有站点取到图标，
 // 代价是把你的书签域名提交给 Google；设为 0 关闭。
 const FAVICON_GOOGLE_FALLBACK = process.env.FAVICON_GOOGLE_FALLBACK !== "0";
+// 是否使用 DuckDuckGo 的 favicon 服务兜底（对 Cloudflare 防护站点尤其有用，
+// 因为直连抓取会被 CF 拦截，而 DDG 有自己的缓存）。设为 0 关闭。
+const FAVICON_DDG_FALLBACK = process.env.FAVICON_DDG_FALLBACK !== "0";
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -555,6 +558,16 @@ app.get("/api/webtitle", auth, async (req, res) => {
   }
   try {
     const resp = await fetchWithTimeout(target, {}, 8000);
+    // Cloudflare 人机验证：返回的是挑战页而非真实内容。
+    // 若放行会把 "Just a moment..." 当成标题存进书签，必须识别并拒绝。
+    const server = (resp.headers.get("server") || "").toLowerCase();
+    const cfMitigated = resp.headers.get("cf-mitigated") || "";
+    if (cfMitigated === "challenge" || (resp.status === 403 && server.includes("cloudflare"))) {
+      return res.status(502).json({
+        error: "cloudflare_blocked",
+        message: "目标站点启用了 Cloudflare 人机验证，无法自动获取，请手动填写",
+      });
+    }
     // 只读前 256KB，足够拿到 <head> 里的 title
     const reader = resp.body.getReader();
     let received = 0;
@@ -569,7 +582,15 @@ app.get("/api/webtitle", auth, async (req, res) => {
     const html = Buffer.concat(chunks).toString("utf8");
     const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
     if (!m) return res.status(404).json({ error: "title_not_found" });
-    res.type("text/plain; charset=utf-8").send(decodeEntities(m[1].trim()));
+    const title = decodeEntities(m[1].trim());
+    // 兜底：部分 CF 配置返回 200 但内容是挑战页
+    if (/^just a moment/i.test(title) || /^attention required/i.test(title)) {
+      return res.status(502).json({
+        error: "cloudflare_blocked",
+        message: "目标站点启用了 Cloudflare 人机验证，无法自动获取，请手动填写",
+      });
+    }
+    res.type("text/plain; charset=utf-8").send(title);
   } catch (err) {
     res.status(502).json({ error: "fetch_failed", message: err.message });
   }
@@ -628,9 +649,14 @@ app.get("/api/favicon", auth, async (req, res) => {
       }
     }
   } catch {}
-  // 2) 约定位置 3) Google 服务兜底（会把你的书签域名发给 Google，
-  //    介意可设 FAVICON_GOOGLE_FALLBACK=0 关闭，关闭后取不到图标时返回 404）
+  // 2) 约定位置 3) 公共图标服务兜底（会把你的书签域名发给第三方，
+  //    介意可分别设 FAVICON_DDG_FALLBACK=0 / FAVICON_GOOGLE_FALLBACK=0 关闭，
+  //    全部关闭后取不到图标时返回 404）
   candidates.push(`${origin}/favicon.ico`);
+  // DuckDuckGo 自带图标缓存，对 Cloudflare 防护站点（直连一律 403）最有用
+  if (FAVICON_DDG_FALLBACK) {
+    candidates.push(`https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`);
+  }
   if (FAVICON_GOOGLE_FALLBACK) {
     candidates.push(
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`

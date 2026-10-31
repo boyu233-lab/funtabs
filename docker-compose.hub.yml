@@ -47,8 +47,10 @@ services:
       # 把下面这行改为 1 才会放行（仅在可信的内网环境下开启）
       - ALLOW_PRIVATE_NET=0
 
-      # 图标取不到时是否用 Google favicon 服务兜底（会把书签域名提交给 Google）。
-      # 设为 0 关闭，完全不外传域名
+      # 图标取不到时是否用公共图标服务兜底（会把书签域名提交给第三方）。
+      # DDG 对 Cloudflare 防护站点最有用（直连会被 CF 拦截，DDG 有自有缓存）；
+      # Google 在国内网络通常不可达。各自设为 0 可单独关闭。
+      - FAVICON_DDG_FALLBACK=1
       - FAVICON_GOOGLE_FALLBACK=1
 
       # 热搜上游：默认 60s 公共实例（限流严格，仅适合轻度使用）。

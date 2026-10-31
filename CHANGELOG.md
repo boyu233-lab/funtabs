@@ -31,6 +31,24 @@ docker images --digests | grep xtab
 
 ---
 
+## [1.3.3] — 2026-10-31
+
+### 修复
+
+- **Cloudflare 防护站点抓取标题返回垃圾内容**：目标站点（如 nodeseek.com）启用
+  Cloudflare 人机验证时，`/api/webtitle` 会把挑战页的 "Just a moment..." 当成真实
+  标题返回并写入书签。现在识别 `cf-mitigated: challenge` 响应头、403+cloudflare
+  组合与挑战页标题特征，返回 `cloudflare_blocked` 错误，前端提示手动填写。
+
+### 新增
+
+- **图标兜底增加 DuckDuckGo 源**：CF 防护站点直连抓取（含 /favicon.ico）一律 403，
+  Google s2 在国内网络常不可达；新增 `https://icons.duckduckgo.com/ip3/<域名>.ico`
+  候选源（自带图标缓存），位于直连与 Google 之间。新增环境变量
+  `FAVICON_DDG_FALLBACK`（默认 1，设 0 关闭）。
+
+---
+
 ## [1.3.2] — 2026-10-31
 
 ### 新增
